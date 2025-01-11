@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 class MultiAgentGridEnv:
+    # Testing MultiAgentGridEnv
     def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, initial_positions, reward_type='global'):
         self.grid = self.load_grid(grid_file)
         self.grid_height, self.grid_width = self.grid.shape  # Use height and width instead of grid_size
