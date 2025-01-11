@@ -1,0 +1,116 @@
+{
+    "episode_number": 1840,
+    "episode_reward": 1202.0,
+    "agent_0": {
+        "actions": [
+            "stay",
+            "stay",
+            "forward",
+            "left",
+            "stay",
+            "stay",
+            "left",
+            "stay",
+            "forward",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay"
+        ],
+        "initial_position": [
+            1,
+            1
+        ]
+    },
+    "agent_1": {
+        "actions": [
+            "stay",
+            "left",
+            "forward",
+            "forward",
+            "forward",
+            "forward",
+            "forward",
+            "forward",
+            "left",
+            "forward",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay"
+        ],
+        "initial_position": [
+            2,
+            1
+        ]
+    },
+    "agent_2": {
+        "actions": [
+            "left",
+            "left",
+            "forward",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "forward",
+            "left",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay"
+        ],
+        "initial_position": [
+            1,
+            2
+        ]
+    },
+    "agent_3": {
+        "actions": [
+            "forward",
+            "forward",
+            "forward",
+            "forward",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "stay",
+            "forward",
+            "stay"
+        ],
+        "initial_position": [
+            2,
+            2
+        ]
+    }
+}
