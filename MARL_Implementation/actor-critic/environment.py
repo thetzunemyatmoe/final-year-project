@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, initial_positions, reward_type='global'):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, initial_positions, reward_type='global'):
         # Load the grid from the JSON file
         self.grid = self.load_grid(grid_file)
 
@@ -16,8 +16,9 @@ class MultiAgentGridEnv:
         # Initialize instance variable
         self.coverage_radius = coverage_radius
         self.max_steps_per_episode = max_steps_per_episode
-        self.num_agents = num_agents
+        self.num_agents = len(initial_positions)
         self.initial_positions = initial_positions
+        print(len(initial_positions))
         self.reward_type = reward_type
 
         # Calculate new obs_size for local rich observations
@@ -27,7 +28,7 @@ class MultiAgentGridEnv:
             1 +  # Current time step
             # Local view of coverage grid and the map
             (2*coverage_radius + 1)**2 * 2 +
-            (num_agents - 1) * 2  # Relative positions of other agents (x, y)
+            (self.num_agents - 1) * 2  # Relative positions of other agents (x, y)
         )
 
         # Reset the environment to initial state
@@ -64,7 +65,6 @@ class MultiAgentGridEnv:
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
         self.calculate_overlap()
-        print(self.reward_track)
 
         return self.get_observations()
 
@@ -81,9 +81,8 @@ class MultiAgentGridEnv:
             self.reward_track[index]['total_area'] = 0
             self.cover_area(index, pos)
 
-        print(self.reward_track)
-
     # Manipulate the coverage grid
+
     def cover_area(self, index, position):
 
         # Extract the x and y coordinates of the agent's position
@@ -131,21 +130,24 @@ class MultiAgentGridEnv:
         self.calculate_overlap()
 
         # Calculate the global reward for the current step
-        global_reward = self.calculate_global_reward()
+        # global_reward = self.calculate_global_reward()
+        rewards = []
+        for index in range(self.num_agents):
+            rewards.append(self.calculate_individual_reward(index))
 
         # Check if the maximun allowed steps reached
         done = self.current_step >= self.max_steps_per_episode
-        return self.get_observations(), global_reward, done, actual_actions
+        return self.get_observations(), rewards, done, actual_actions
 
     def get_new_position(self, position, action):
         x, y = position
-        if action == 0:  # forward (positive x)
+        if action == 0:  # X - RIGHT
             return (min(x + 1, self.grid_width - 1), y)
-        elif action == 1:  # backward (negative x)
+        elif action == 1:  # X - LEFT
             return (max(x - 1, 0), y)
-        elif action == 2:  # left (positive y)
+        elif action == 2:  # Y - DOWN
             return (x, min(y + 1, self.grid_height - 1))
-        elif action == 3:  # right (negative y)
+        elif action == 3:  # Y - UP
             return (x, max(y - 1, 0))
         else:  # stay
             return (x, y)
@@ -219,13 +221,14 @@ class MultiAgentGridEnv:
 
         # Now, calculate overlap contribution for each UAV
         for index, pos in enumerate(self.agent_positions):
+            self.reward_track[index]["overlap"] = 0
             temp_grid = np.zeros_like(self.coverage_grid)
             self.cover_area_on_grid(pos, temp_grid)
 
             # Compute overlap introduced by this UAV
             # Only count where overlap happens
             overlap_counts = (overlap_grid > 1) * temp_grid
-            self.reward_track[index]["overlap"] = np.sum(overlap_counts)
+            self.reward_track[index]["overlap"] = int(np.sum(overlap_counts))
 
     # Utility function to deal with overlap penalty calculation
     def cover_area_on_grid(self, state, grid):

@@ -1,10 +1,13 @@
-from environment import MultiAgentGridEnv
-env = MultiAgentGridEnv(
-        grid_file='grid_world.json',
-        coverage_radius=4,
-        max_steps_per_episode=50,
-        num_agents=4,
-        initial_positions=[(25, 25), (1, 1), (2, 2), (3, 3)]
-    )
+t_max = 100
+batch_size = 20
+t = 0
 
-print(env.get_observations()[0])
+for _ in range(t_max):
+    t_start = t
+
+    while not t - t_start == batch_size:
+        print(t)
+        t += 1
+
+    print('------------')
+    break
