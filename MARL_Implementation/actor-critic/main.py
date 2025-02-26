@@ -48,15 +48,16 @@ class A3C3Agent:
         self.gamma = gamma
         self.total_step = 0
 
+        self.actor_loss = {}
+        self.critic_loss = {}
+
         # Actor and Critic networks
         self.actor = ActorNetwork(self.actor_state_size, self.action_size)
         self.critic = CriticNetwork(self.critic_state_size)
 
         # Optimizers for the actor and critic networks
-        self.actor_optimizer = optim.Adam(
-            self.actor.parameters(), lr=learning_rate)
-        self.critic_optimizer = optim.Adam(
-            self.critic.parameters(), lr=learning_rate)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=0.01)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=0.01)
 
     def actor_act(self, state):
         state = torch.tensor(state)
@@ -67,6 +68,9 @@ class A3C3Agent:
         return action.item(), dist.log_prob(action)
 
     def critic_act(self, state):
+        '''
+        state - Python list (containing each individual partial observations)
+        '''
         state = [i for obv in state for i in obv]
         state = torch.tensor(state)
 
@@ -79,26 +83,18 @@ class A3C3Agent:
         # Calculate advantage: A3C3 Advantage = R_j - V(O_j^i)
         return reward + next_value_estimate - value_estimate
 
-    def compute_loss(self, global_state_value, global_state):
-
-        # Value loss
-        global_state_value = torch.tensor(global_state_value)
-        global_state = [i for obv in global_state for i in obv]
-        global_state = torch.tensor(global_state)
-        value = self.critic(global_state)
-        value_loss = (global_state_value - value).pow(2).mean()
-
-        return value_loss, actor_loss
-
-    def update(self, global_state_value, memory, index):
-        reward = memory['rewards'][index]
-        global_state_value = reward + global_state_value
-
-        value_loss, actor_loss = self.compute_loss(
-            global_state_value, memory["global_state"])
+    def compute_losses(self, value, memory, time):
+        '''
+        value - tensor
+        memeory - dictionary ("global_state", "reward", "next_global_state")
+        time - time step t (int)
+        '''
+        # Critic loss calculated and stored
+        critic_loss = value - self.critic_act(memory['global_state'])
+        self.critic_loss[time] = critic_loss
 
 
-def train(num_episodes, learning_rate, gamma, beta, N, batch_size, step_counter):
+def train(num_episodes, batch_size):
 
     env = MultiAgentGridEnv(
         grid_file='grid_world.json',
@@ -116,16 +112,16 @@ def train(num_episodes, learning_rate, gamma, beta, N, batch_size, step_counter)
     agents = [A3C3Agent(actor_state_size, action_size, critic_state_size,
                         learning_rate=0.001, beta=0.001, gamma=0.001)]
 
-    for episode in range(num_episodes):
+    for _ in range(num_episodes):
         global_state = env.reset()
-        total_reward = 0
+        # total_reward = 0
         done = False
         episode_actions = []
 
         t_start = t
 
         memory = {}
-        while not done or not t - t_start == batch_size:
+        while not done or t - t_start != batch_size:
             actions = [agent.actor_act(global_state[i])  # sensor_readings[i]) is sensor necessary
                        for i, agent in enumerate(agents)]
             next_gloabl_state, rewards, done, actual_actions = env.step(
@@ -139,10 +135,20 @@ def train(num_episodes, learning_rate, gamma, beta, N, batch_size, step_counter)
 
             global_state = next_gloabl_state
 
-        # #  rewards -> [List of each UAV reward]
+        # Currently t is at the new state (no actions for this states are taken)
         for index, agent in enumerate(agents):
-            global_state_value = 0 if done else agent.critic_act(global_state)
+            # Value is either a tensor or normal int.
+            VALUE = 0 if done else agent.critic_act(global_state)
 
             # Backward
             for time in range(t-1, t_start, -1):
-                agents.update(global_state_value, memory[time], index)
+                reward = memory[time][rewards][index]
+                # VALUE = 0
+                if isinstance(VALUE, int):
+                    VALUE += reward
+                    VALUE = torch.tensor(VALUE)
+                # VALUE is a TENSOR
+                else:
+                    VALUE += torch.tensor(reward)
+                # Compute loss for actor and critic.
+                agent.compute_losses(VALUE, memory[time], time)
