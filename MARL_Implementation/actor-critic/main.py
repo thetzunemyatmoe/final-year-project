@@ -60,7 +60,7 @@ class A3C3Agent:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=0.01)
 
     def actor_act(self, state):
-        state = torch.tensor(state)
+        state = torch.tensor(state).float()
         # Select action based on the actor's policy
         action_probs = self.actor(state)
         dist = torch.distributions.Categorical(action_probs)
@@ -72,7 +72,7 @@ class A3C3Agent:
         state - Python list (containing each individual partial observations)
         '''
         state = [i for obv in state for i in obv]
-        state = torch.tensor(state)
+        state = torch.tensor(state).float()
 
         # Extrating value from critic network
         value = self.critic(state)
@@ -90,8 +90,10 @@ class A3C3Agent:
         time - time step t (int)
         '''
         # Critic loss calculated and stored
-        critic_loss = value - self.critic_act(memory['global_state'])
+        critic_loss = (value - self.critic_act(memory['global_state'])).pow(2)
         self.critic_loss[time] = critic_loss
+
+        # Actor
 
 
 def train(num_episodes, batch_size):
@@ -142,7 +144,7 @@ def train(num_episodes, batch_size):
 
             # Backward
             for time in range(t-1, t_start, -1):
-                reward = memory[time][rewards][index]
+                reward = memory[time]["rewards"][index]
                 # VALUE = 0
                 if isinstance(VALUE, int):
                     VALUE += reward
