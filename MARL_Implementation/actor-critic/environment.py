@@ -141,7 +141,6 @@ class MultiAgentGridEnv:
 
     def get_new_position(self, position, action):
         x, y = position
-        print(f'Action receive by get_new_positon {action}')
         if action == 0:  # X - RIGHT
             return (min(x + 1, self.grid_width - 1), y)
         elif action == 1:  # X - LEFT

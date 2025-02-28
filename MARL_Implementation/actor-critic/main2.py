@@ -41,14 +41,21 @@ class GlobalActorCritic(nn.Module):
         self.actor = Actor(actor_input_size, action_size)
         self.critic = Critic(critic_input_size)
 
-    def forward(self, partial_obs, global_obs):
-        policy = self.actor(partial_obs)  # Shared actor for all agents
-        value = self.critic(global_obs)  # Shared centralized critic
+    def forward(self, global_obs, partial_obs):
+        # Critic
+        global_obs = [i for obv in global_obs for i in obv]
+        global_state = torch.tensor(global_obs, dtype=torch.float32)
+        value = self.critic(global_state)  # Shared centralized critic
+
+        # Actor
+        partial_state = torch.tensor(partial_obs, dtype=torch.float32)
+        policy = self.actor(partial_state)  # Shared actor for all agents
+
         return policy, value
 
 
 class Worker(mp.Process):
-    def __init__(self, global_model, optimizer, num_agents, num_episode, gamma=0.99, beta=0.01, t_max=5, ):
+    def __init__(self, global_model, optimizer, num_agents, num_episode, gamma=0.99, beta=0.01, t_max=5):
         super(Worker, self).__init__()
 
         # The environment
@@ -72,10 +79,7 @@ class Worker(mp.Process):
 
     def run(self):
         global_state = self.env.reset()
-        print(f'The datatype of global state {type(global_state[0])}')
-        global_state = torch.tensor(global_state, dtype=torch.float32)
-
-        print(f'The datatype of global state {type(global_state)}')
+        global_reward = []
 
         for _ in range(self.num_episode):
             log_probs = [[] for _ in range(self.num_agents)]
@@ -91,7 +95,7 @@ class Worker(mp.Process):
                     policy, value = self.global_model(
                         global_state, global_state[agent_id])
 
-                    action = torch.argmx(policy, 1).item()
+                    action = torch.argmax(policy, 0).item()
                     # Log probabiltiy for actor loss
                     log_probs[agent_id].append(torch.log(policy[action]))
                     # Value for actor and critic loss
@@ -100,8 +104,7 @@ class Worker(mp.Process):
                     actions.append(action)
 
                 next_global_state, reward, done, _ = self.env.step(actions)
-                next_global_state = torch.tensor(
-                    next_global_state, dtype=torch.float32)
+                global_reward.append(sum(reward))
 
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
@@ -114,7 +117,7 @@ class Worker(mp.Process):
             for agent_id in range(self.num_agents):
                 #
                 R = 0 if done else self.global_model(
-                    global_state, agent_id)[1].item()
+                    global_state, global_state[agent_id])[1].item()
                 for reward in reversed(rewards[agent_id]):
                     R = reward + self.gamma * R
                     returns[agent_id].insert(0, R)
@@ -147,6 +150,8 @@ class Worker(mp.Process):
             for global_param, local_param in zip(self.global_model.parameters(), self.global_model.parameters()):
                 global_param._grad = local_param.grad
             self.optimizer.step()
+
+        print(len(global_reward))
 
 
 if __name__ == '__main__':
