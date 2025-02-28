@@ -63,8 +63,11 @@ class A3C3Agent:
         state = torch.tensor(state).float()
         # Select action based on the actor's policy
         action_probs = self.actor(state)
+        # print(action_probs)
         dist = torch.distributions.Categorical(action_probs)
+        # print(dist)
         action = dist.sample()
+
         return action.item(), dist.log_prob(action)
 
     def critic_act(self, state):
@@ -112,7 +115,7 @@ def train(num_episodes, batch_size):
         env.num_agents  # Currently unpack the array
 
     agents = [A3C3Agent(actor_state_size, action_size, critic_state_size,
-                        learning_rate=0.001, beta=0.001, gamma=0.001)]
+                        learning_rate=0.001, beta=0.001, gamma=0.001) for _ in range(env.num_agents)]
 
     for _ in range(num_episodes):
         global_state = env.reset()
@@ -123,34 +126,47 @@ def train(num_episodes, batch_size):
         t_start = t
 
         memory = {}
-        while not done or t - t_start != batch_size:
-            actions = [agent.actor_act(global_state[i])  # sensor_readings[i]) is sensor necessary
+        while t - t_start != batch_size:
+            print(
+                f'Current State value (from critic) : {agents[1].critic_act(global_state)}')
+            # sensor_readings[i]) is sensor necessary
+            actions = [agent.actor_act(global_state[i])
                        for i, agent in enumerate(agents)]
             next_gloabl_state, rewards, done, actual_actions = env.step(
                 actions)
             episode_actions.append(actual_actions)
-            t += 1
 
-            memory[t]["global_state"] = global_state
-            memory[t]["next_global_state"] = next_gloabl_state
-            memory[t]["rewards"] = rewards
+            memory[t] = {
+                "global_state": global_state,
+                "next_global_state": next_gloabl_state,
+                "rewards": rewards
+
+            }
 
             global_state = next_gloabl_state
+            print(
+                f'Next State value (from critic) : {agents[1].critic_act(global_state)}')
+            t += 1
 
-        # Currently t is at the new state (no actions for this states are taken)
-        for index, agent in enumerate(agents):
-            # Value is either a tensor or normal int.
-            VALUE = 0 if done else agent.critic_act(global_state)
+            print('---------------')
 
-            # Backward
-            for time in range(t-1, t_start, -1):
-                reward = memory[time]["rewards"][index]
-                # VALUE = 0
-                if isinstance(VALUE, int):
-                    VALUE += reward
-                    VALUE = torch.tensor(VALUE)
-                # VALUE is a TENSOR
-                else:
-                    VALUE += torch.tensor(reward)
-                # Compute loss for actor and critic.
-                agent.compute_losses(VALUE, memory[time], time)
+        # # Currently t is at the new state (no actions for this states are taken)
+        # for index, agent in enumerate(agents):
+        #     # Value is either a tensor or normal int.
+        #     VALUE = 0 if done else agent.critic_act(global_state)
+
+        #     # Backward
+        #     for time in range(t-1, t_start, -1):
+        #         reward = memory[time]["rewards"][index]
+        #         # VALUE = 0
+        #         if isinstance(VALUE, int):
+        #             VALUE += reward
+        #             VALUE = torch.tensor(VALUE)
+        #         # VALUE is a TENSOR
+        #         else:
+        #             VALUE += torch.tensor(reward)
+        #         # Compute loss for actor and critic.
+        #         agent.compute_losses(VALUE, memory[time], time)
+
+
+train(1, 10)

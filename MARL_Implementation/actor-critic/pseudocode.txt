@@ -1,0 +1,34 @@
+Algorithm 1 Pseudo-code for A3C3’s worker thread. Workers locally  copy global parameters, sample the observations and rewards for all agents, and output corresponding actions and messages. Steps are taken until a mini-batch has been gathered, or a terminal state is reached. Workers compute the loss locally, apply gradients globally, and repeat this process until convergence has been achieved. 
+
+Require: Globally, shared learning rate η, discount factor γ , entropy weight β, number of agents J, actor network weights θ_j_a , critic network weights θ_j_v , batch size t_max , maximum iterations T_max . Locally, actor network weights ϑ_j_a , critic network weights ϑ_j_v , and step counter t 
+1: t ← 0 
+2: for iteration T = 0 , T max do 
+    3: Reset gradients dθ j a ← 0 all agents j 
+    4: Synchronize ϑ j a ← θ j a , ϑ j v ← θ j v for all agents j 
+    5: t start ← t 
+    6: Sample observation o j t for all agents j 
+    7: Sample or derive centralized observation O j t for all agents j 
+    8: repeat 
+            9: for agent j = 1 , J do 
+                   10: Sample action a_j_t according to policy π(a j t | o j t , ϑ j a ) 
+                   11: end for 
+            12: Take action a_j_t for all agents j 
+            13: Sample reward r j t and new observation o j t+1 for all agents j 
+            14: Sample or derive centralized observation O j t+1 for all agents j 
+            15: t ← t + 1 
+            16: until terminal o j t for all agents j or t − t start = t max 
+17: for agent j = 1 , J do 
+        18: R j =   0 for terminal observation o j t V (O j t ,ϑ j v ) otherwise 
+        19: for step i = t − 1 , t start do 
+                20: R j ← r j i + γ R j 
+                21: Value loss L j v i ← (R j −V (O j i , θ j v ))^2
+                22: Actor loss L j a i ← log π(a j i | o j i , ϑ j a ) ADV A3C3 − βH(π(a j i | o j i, ϑ j a )) 
+        23: end for 
+        24: for agent j = 1 , J do 
+               25: for step i = t − 1 , t_start do 
+                   26: Accumulate gradients d θ j a ← d θ j a + ∂L j a / ∂ϑ j a , d θ j v ← d θ j v + ∂L j v / ∂ϑ j v 
+               27: end for 
+        28: end for 
+
+ 30: Update network weights θ j a ← θ j a + ηdθ j a , θ j v ← θ j v + ηdθ j v for all agents j 
+31: end for 

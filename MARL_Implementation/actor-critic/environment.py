@@ -18,7 +18,6 @@ class MultiAgentGridEnv:
         self.max_steps_per_episode = max_steps_per_episode
         self.num_agents = len(initial_positions)
         self.initial_positions = initial_positions
-        print(len(initial_positions))
         self.reward_type = reward_type
 
         # Calculate new obs_size for local rich observations
@@ -96,6 +95,7 @@ class MultiAgentGridEnv:
                     self.reward_track[index]["total_area"] += 1
 
     def step(self, actions):
+        # print(actions[1])
         """
             Executes a single step in the environment based on the agents' actions.
         """
@@ -141,6 +141,7 @@ class MultiAgentGridEnv:
 
     def get_new_position(self, position, action):
         x, y = position
+        print(f'Action receive by get_new_positon {action}')
         if action == 0:  # X - RIGHT
             return (min(x + 1, self.grid_width - 1), y)
         elif action == 1:  # X - LEFT
@@ -192,7 +193,7 @@ class MultiAgentGridEnv:
 
         reward = (
             self.total_area
-            - (0.75) * self.overlap_penalty
+            - (0.75) * self.overlap
         )
         return reward
 
@@ -280,7 +281,6 @@ class MultiAgentGridEnv:
                                    self.coverage_radius * 4])
 
             observations.append(np.array(obs, dtype=np.float32))
-
         return observations
 
     def get_obs_size(self):
