@@ -60,11 +60,13 @@ class Worker(mp.Process):
 
         # The environment
         self.env = MultiAgentGridEnv(
-            grid_file='grid_world.json',
-            coverage_radius=4,
+            grid_file='grid_world_test.json',
+            coverage_radius=3,
             max_steps_per_episode=50,
-            initial_positions=[(25, 25), (26, 25), (25, 26), (26, 26)]
+            initial_positions=[(0, 0), (0, 1), (0, 2), (0, 3)]
         )
+        # print(f'Environement without UAVs \n {self.env.grid}')
+        # print(f'This is in Worker constructer \n {self.env.coverage_grid}')
 
         # Global model and the oprimizer
         self.global_model = global_model
@@ -79,9 +81,12 @@ class Worker(mp.Process):
 
     def run(self):
         global_state = self.env.reset()
-        global_reward = []
+        # print(f'This is in Worker constructer \n {self.env.coverage_grid}')
+
+        print('-------------------------')
 
         for _ in range(self.num_episode):
+
             log_probs = [[] for _ in range(self.num_agents)]
             values = [[] for _ in range(self.num_agents)]
             rewards = [[] for _ in range(self.num_agents)]
@@ -104,7 +109,7 @@ class Worker(mp.Process):
                     actions.append(action)
 
                 next_global_state, reward, done, _ = self.env.step(actions)
-                global_reward.append(sum(reward))
+                # global_reward.append(sum(reward))
 
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
@@ -151,17 +156,18 @@ class Worker(mp.Process):
                 global_param._grad = local_param.grad
             self.optimizer.step()
 
-        print(len(global_reward))
+        print(self.env.agent_positions)
+        print(self.env.coverage_grid)
 
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
 
     env = MultiAgentGridEnv(
-        grid_file='grid_world.json',
-        coverage_radius=4,
+        grid_file='grid_world_test.json',
+        coverage_radius=3,
         max_steps_per_episode=50,
-        initial_positions=[(25, 25), (26, 25), (25, 26), (26, 26)]
+        initial_positions=[(0, 1), (0, 2), (0, 3), (0, 4)]
     )
 
     global_model = GlobalActorCritic(

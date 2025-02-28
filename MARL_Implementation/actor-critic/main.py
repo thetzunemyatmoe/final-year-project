@@ -169,4 +169,4 @@ def train(num_episodes, batch_size):
         #         agent.compute_losses(VALUE, memory[time], time)
 
 
-train(1, 10)
+train(5, 100)

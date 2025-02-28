@@ -31,7 +31,7 @@ class MultiAgentGridEnv:
         )
 
         # Reset the environment to initial state
-        self.reset()
+        # self.reset()
 
     def load_grid(self, filename):
         """
@@ -86,15 +86,20 @@ class MultiAgentGridEnv:
 
         # Extract the x and y coordinates of the agent's position
         x, y = position
+        # print(f'Positon grabbed {x}, {y}')
         for dx in range(-self.coverage_radius, self.coverage_radius + 1):
             for dy in range(-self.coverage_radius, self.coverage_radius + 1):
                 nx, ny = x + dx, y + dy
                 # Mark the cell when it's valid (empty and within range)
                 if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
-                    self.coverage_grid[ny, nx] = 1
+                    # print(f"chosen cells ({nx}, {ny})")
+                    self.coverage_grid[nx, ny] = 1
                     self.reward_track[index]["total_area"] += 1
 
+        # self.coverage_grid[x, y] = 2
+
     def step(self, actions):
+        # print(actions)
         # print(actions[1])
         """
             Executes a single step in the environment based on the agents' actions.
