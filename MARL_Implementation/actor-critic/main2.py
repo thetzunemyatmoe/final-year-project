@@ -61,7 +61,7 @@ class Worker(mp.Process):
         # The environment
         self.env = MultiAgentGridEnv(
             grid_file='grid_world_test.json',
-            coverage_radius=3,
+            coverage_radius=1,
             max_steps_per_episode=50,
             initial_positions=[(0, 0), (0, 1), (0, 2), (0, 3)]
         )
@@ -82,18 +82,19 @@ class Worker(mp.Process):
     def run(self):
         global_state = self.env.reset()
         # print(f'This is in Worker constructer \n {self.env.coverage_grid}')
+        print(self.env.coverage_grid)
 
         print('-------------------------')
 
         for _ in range(self.num_episode):
 
-            log_probs = [[] for _ in range(self.num_agents)]
-            values = [[] for _ in range(self.num_agents)]
-            rewards = [[] for _ in range(self.num_agents)]
+            log_probs = [[0]*self.t_max for _ in range(self.num_agents)]
+            values = [[0]*self.t_max for _ in range(self.num_agents)]
+            rewards = [[0]*self.t_max for _ in range(self.num_agents)]
 
             # Collect mini-batch of experiences
-            for _ in range(self.t_max):
-                actions = []
+            for t in range(self.t_max):
+                actions = [0] * self.num_agents
                 # Actions selection
                 for agent_id in range(self.num_agents):
                     # Feed the global state and agent index into actor and critic
@@ -102,52 +103,69 @@ class Worker(mp.Process):
 
                     action = torch.argmax(policy, 0).item()
                     # Log probabiltiy for actor loss
-                    log_probs[agent_id].append(torch.log(policy[action]))
+                    log_probs[agent_id][t] = torch.log(policy[action])
                     # Value for actor and critic loss
-                    values[agent_id].append(value)
+                    values[agent_id][t] = value
                     # Actions chosen
-                    actions.append(action)
+                    actions[agent_id] = action
 
                 next_global_state, reward, done, _ = self.env.step(actions)
                 # global_reward.append(sum(reward))
 
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
-                    rewards[agent_id].append(reward[agent_id])
+                    rewards[agent_id][t] = reward[agent_id]
 
                 global_state = next_global_state
 
             # Compute Advantage and Returns
-            returns = [[] for _ in range(self.num_agents)]
+            returns = [[0]*self.t_max for _ in range(self.num_agents)]
             for agent_id in range(self.num_agents):
-                #
+                # Value of the current state
                 R = 0 if done else self.global_model(
                     global_state, global_state[agent_id])[1].item()
-                for reward in reversed(rewards[agent_id]):
+
+                # Calculating value of
+                for time, reward in reversed(list(enumerate(rewards[agent_id]))):
+
                     R = reward + self.gamma * R
-                    returns[agent_id].insert(0, R)
+                    returns[agent_id][time] = R
+
                 returns[agent_id] = torch.tensor(
                     returns[agent_id], dtype=torch.float32)
 
             # Compute Losses
-            actor_losses = []
-            critic_losses = []
+            actor_losses = [[0]*self.t_max for _ in range(self.num_agents)]
+            critic_losses = [[0]*self.t_max for _ in range(self.num_agents)]
 
             for agent_id in range(self.num_agents):
-                # Calculating advantage
-                advantage = returns[agent_id] - torch.cat(values[agent_id])
-                actor_loss = - \
-                    (torch.stack(log_probs[agent_id])
-                     * advantage.detach()).mean()
-                critic_loss = advantage.pow(2).mean()
-                entropy = - \
-                    torch.sum(torch.stack(
-                        log_probs[agent_id]) * torch.exp(torch.stack(log_probs[agent_id])))
+                # For each step backward
+                for time in range(self.t_max-1, -1, -1):
+                    # print(
+                    #     f' The return of agent {agent_id} at time {time} is {type(returns[agent_id][time])}')
+                    advantage = returns[agent_id][time] - \
+                        values[agent_id][time]
 
-                actor_losses.append(actor_loss - self.beta * entropy)
-                critic_losses.append(critic_loss)
+                    critic_loss = advantage.pow(2).mean()
+                    critic_losses[agent_id][time] = critic_loss.item()
 
+            for agent_id in range(self.num_agents):
+                print(critic_losses[agent_id])
+
+            # Calculating advantage
+            # advantage = returns[agent_id] - torch.cat(values[agent_id])
+
+            # actor_loss = - (torch.stack(log_probs[agent_id])
+            #                 * advantage.detach()).mean()
+            # critic_loss = advantage.pow(2).mean()
+            # entropy = -torch.sum(torch.stack(
+            #     log_probs[agent_id]) * torch.exp(torch.stack(log_probs[agent_id])))
+
+            # actor_losses.append(actor_loss - self.beta * entropy)
+            # critic_losses.append(critic_loss)
+            break
             total_loss = sum(actor_losses) + sum(critic_losses)
+            print(total_loss.item())
 
             # Update Global Model
             self.optimizer.zero_grad()
@@ -165,15 +183,15 @@ if __name__ == '__main__':
 
     env = MultiAgentGridEnv(
         grid_file='grid_world_test.json',
-        coverage_radius=3,
+        coverage_radius=1,
         max_steps_per_episode=50,
         initial_positions=[(0, 1), (0, 2), (0, 3), (0, 4)]
     )
 
     global_model = GlobalActorCritic(
-        actor_input_size=env.get_obs_size(
-        ),
-        critic_input_size=env.get_obs_size() * env.num_agents, action_size=env.get_total_actions())
+        actor_input_size=env.get_obs_size(),
+        critic_input_size=env.get_obs_size() * env.num_agents,
+        action_size=env.get_total_actions())
     global_model.share_memory()
 
     optimizer = optim.Adam(global_model.parameters(), lr=0.001)
@@ -183,7 +201,7 @@ if __name__ == '__main__':
     workers = []
     for worker_id in range(1):
         worker = Worker(
-            global_model, optimizer, env.num_agents, num_episode=100)
+            global_model, optimizer, env.num_agents, num_episode=5000)
         workers.append(worker)
         worker.start()
 

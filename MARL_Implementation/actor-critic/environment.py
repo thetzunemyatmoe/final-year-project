@@ -93,7 +93,7 @@ class MultiAgentGridEnv:
                 # Mark the cell when it's valid (empty and within range)
                 if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
                     # print(f"chosen cells ({nx}, {ny})")
-                    self.coverage_grid[nx, ny] = 1
+                    self.coverage_grid[ny, nx] = 1
                     self.reward_track[index]["total_area"] += 1
 
         # self.coverage_grid[x, y] = 2
