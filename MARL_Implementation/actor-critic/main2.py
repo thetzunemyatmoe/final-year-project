@@ -59,9 +59,15 @@ class GlobalActorCritic(nn.Module):
 
         return entropy
 
+    def get_actor_params(self):
+        return self.actor.parameters()
+
+    def get_critic_params(self):
+        return self.critic.parameters()
+
 
 class Worker(mp.Process):
-    def __init__(self, global_model, optimizer, num_agents, num_episode, gamma=0.99, beta=0.01, t_max=5):
+    def __init__(self, global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, gamma=0.99, beta=0.01, t_max=5):
         super(Worker, self).__init__()
 
         # The environment
@@ -71,12 +77,19 @@ class Worker(mp.Process):
             max_steps_per_episode=50,
             initial_positions=[(0, 0), (0, 1), (0, 2), (0, 3)]
         )
-        # print(f'Environement without UAVs \n {self.env.grid}')
-        # print(f'This is in Worker constructer \n {self.env.coverage_grid}')
 
-        # Global model and the oprimizer
+        # Local model
+        self.local_model = GlobalActorCritic(
+            actor_input_size=self.env.get_obs_size(),
+            critic_input_size=self.env.get_obs_size() * env.num_agents,
+            action_size=self.env.get_total_actions())
+
+        # Global model
         self.global_model = global_model
-        self.optimizer = optimizer
+
+        # Optimizer for actor and critic
+        self.actor_optimizer = actor_optimizer
+        self.critic_optimizer = critic_optimizer
 
         # Variables
         self.num_agents = num_agents
@@ -85,15 +98,20 @@ class Worker(mp.Process):
         self.t_max = t_max
         self.num_episode = num_episode
 
-    def run(self):
-        global_state = self.env.reset()
-        # print(f'This is in Worker constructer \n {self.env.coverage_grid}')
-        print(self.env.coverage_grid)
+    # Syncing the parameter of local model with global model's parameter
+    def sync_local_with_global(self):
+        self.local_model.load_state_dict(self.global_model.state_dict())
 
-        print('-------------------------')
+    def run(self):
 
         for _ in range(self.num_episode):
+            # Resetting the environment
+            global_state = self.env.reset()
 
+            # Synchronzie local model with global model
+            self.sync_local_with_global()
+
+            # History storing for loss calculation
             log_probs = [[0]*self.t_max for _ in range(self.num_agents)]
             policy_entropies = [[0]*self.t_max for _ in range(self.num_agents)]
             values = [[0]*self.t_max for _ in range(self.num_agents)]
@@ -102,35 +120,37 @@ class Worker(mp.Process):
             # Collect mini-batch of experiences
             for t in range(self.t_max):
                 actions = [0] * self.num_agents
-                # Actions selection
+                # Actions selection (From actor)
                 for agent_id in range(self.num_agents):
-                    # Feed the global state and agent index into actor and critic
-                    policy, value, policy_entropy = self.global_model(
+                    # Feed the global state and partial observation the local model
+                    policy, value, policy_entropy = self.local_model(
                         global_state, global_state[agent_id])
 
                     action = torch.argmax(policy, 0).item()
-                    # Log probabiltiy for actor loss
+                    # Log probabiltiy and Entropy for actor loss in timestep t
                     log_probs[agent_id][t] = torch.log(policy[action])
                     policy_entropies[agent_id][t] = policy_entropy
 
-                    # Value for actor and critic loss
+                    # Value for critic loss
                     values[agent_id][t] = value
                     # Actions chosen
                     actions[agent_id] = action
 
+                # Execurint actions
                 next_global_state, reward, done, _ = self.env.step(actions)
-                # global_reward.append(sum(reward))
 
+                # Storing reward for each agent in each timestep
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
                     rewards[agent_id][t] = reward[agent_id]
 
                 global_state = next_global_state
-            # Compute Advantage and Returns
+
+            # Compute Advantage and Returns(Value)
             returns = [[0]*self.t_max for _ in range(self.num_agents)]
             for agent_id in range(self.num_agents):
                 # Value of the current state
-                R = 0 if done else self.global_model(
+                R = 0 if done else self.local_model(
                     global_state, global_state[agent_id])[1].item()
 
                 # Calculating value of
@@ -162,30 +182,33 @@ class Worker(mp.Process):
                         advantage - policy_entropies[agent_id][time]
                     actor_losses[agent_id][time] = actor_loss
 
-            # Calculating advantage
-            # advantage = returns[agent_id] - torch.cat(values[agent_id])
+            # Resetting gradient
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
 
-            # actor_loss = - (torch.stack(log_probs[agent_id])
-            #                 * advantage.detach()).mean()
-            # critic_loss = advantage.pow(2).mean()
-            # entropy = -torch.sum(torch.stack(
-            #     log_probs[agent_id]) * torch.exp(torch.stack(log_probs[agent_id])))
+            # Loop over agents
+            for agent_id in range(self.num_agents):
+                for t in reversed(range(self.t_max)):  # Backward through time
+                    # Compute actor and critic loss for this agent at timestep t
+                    actor_loss = actor_losses[agent_id][t]
+                    critic_loss = critic_losses[agent_id][t]
 
-            # actor_losses.append(actor_loss - self.beta * entropy)
-            # critic_losses.append(critic_loss)
-            break
-            total_loss = sum(actor_losses) + sum(critic_losses)
-            print(total_loss.item())
+                    # Compute gradients separately
+                    critic_loss.backward(retain_graph=True)
+                    actor_loss.backward()
 
-            # Update Global Model
-            self.optimizer.zero_grad()
-            total_loss.backward()
-            for global_param, local_param in zip(self.global_model.parameters(), self.global_model.parameters()):
-                global_param._grad = local_param.grad
-            self.optimizer.step()
+                    # Accumulate gradients across all timesteps
+                    for local_param, global_param in zip(self.local_model.parameters(), self.global_model.parameters()):
+                        if local_param.grad is not None:
+                            if global_param.grad is None:
+                                global_param.grad = local_param.grad.clone()
+                            else:
+                                global_param.grad += local_param.grad.clone()
+            # Apply updates to global model
+            self.critic_optimizer.step()
+            self.actor_optimizer.step()
 
         print(self.env.agent_positions)
-        print(self.env.coverage_grid)
 
 
 if __name__ == '__main__':
@@ -204,14 +227,13 @@ if __name__ == '__main__':
         action_size=env.get_total_actions())
     global_model.share_memory()
 
-    optimizer = optim.Adam(global_model.parameters(), lr=0.001)
-
-    # ---------------------
+    actor_optimizer = optim.Adam(global_model.get_actor_params(), lr=0.0005)
+    critic_optimizer = optim.Adam(global_model.get_critic_params(), lr=0.001)
 
     workers = []
     for worker_id in range(1):
         worker = Worker(
-            global_model, optimizer, env.num_agents, num_episode=5000)
+            global_model, actor_optimizer, critic_optimizer, env.num_agents, num_episode=5000)
         workers.append(worker)
         worker.start()
 
