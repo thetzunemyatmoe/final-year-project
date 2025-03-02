@@ -51,7 +51,13 @@ class GlobalActorCritic(nn.Module):
         partial_state = torch.tensor(partial_obs, dtype=torch.float32)
         policy = self.actor(partial_state)  # Shared actor for all agents
 
-        return policy, value
+        return policy, value, -self.compute_entropy(policy)
+
+    def compute_entropy(self, action_probs):
+        log_probs = torch.log(action_probs + 1e-8)
+        entropy = -torch.sum(action_probs * log_probs, dim=-1)
+
+        return entropy
 
 
 class Worker(mp.Process):
@@ -89,6 +95,7 @@ class Worker(mp.Process):
         for _ in range(self.num_episode):
 
             log_probs = [[0]*self.t_max for _ in range(self.num_agents)]
+            policy_entropies = [[0]*self.t_max for _ in range(self.num_agents)]
             values = [[0]*self.t_max for _ in range(self.num_agents)]
             rewards = [[0]*self.t_max for _ in range(self.num_agents)]
 
@@ -98,12 +105,14 @@ class Worker(mp.Process):
                 # Actions selection
                 for agent_id in range(self.num_agents):
                     # Feed the global state and agent index into actor and critic
-                    policy, value = self.global_model(
+                    policy, value, policy_entropy = self.global_model(
                         global_state, global_state[agent_id])
 
                     action = torch.argmax(policy, 0).item()
                     # Log probabiltiy for actor loss
                     log_probs[agent_id][t] = torch.log(policy[action])
+                    policy_entropies[agent_id][t] = policy_entropy
+
                     # Value for actor and critic loss
                     values[agent_id][t] = value
                     # Actions chosen
@@ -117,7 +126,6 @@ class Worker(mp.Process):
                     rewards[agent_id][t] = reward[agent_id]
 
                 global_state = next_global_state
-
             # Compute Advantage and Returns
             returns = [[0]*self.t_max for _ in range(self.num_agents)]
             for agent_id in range(self.num_agents):
@@ -141,16 +149,18 @@ class Worker(mp.Process):
             for agent_id in range(self.num_agents):
                 # For each step backward
                 for time in range(self.t_max-1, -1, -1):
-                    # print(
-                    #     f' The return of agent {agent_id} at time {time} is {type(returns[agent_id][time])}')
+
                     advantage = returns[agent_id][time] - \
                         values[agent_id][time]
 
-                    critic_loss = advantage.pow(2).mean()
-                    critic_losses[agent_id][time] = critic_loss.item()
+                    # Calculating critic (value) loss
+                    critic_loss = advantage.pow(2)
+                    critic_losses[agent_id][time] = critic_loss
 
-            for agent_id in range(self.num_agents):
-                print(critic_losses[agent_id])
+                    # Calculating actor loss
+                    actor_loss = log_probs[agent_id][time] * \
+                        advantage - policy_entropies[agent_id][time]
+                    actor_losses[agent_id][time] = actor_loss
 
             # Calculating advantage
             # advantage = returns[agent_id] - torch.cat(values[agent_id])
