@@ -67,15 +67,17 @@ class GlobalActorCritic(nn.Module):
 
 
 class Worker(mp.Process):
-    def __init__(self, global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, gamma=0.99, beta=0.01, t_max=5):
+    def __init__(self,
+                 global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, grid_file, coverage_radius, max_steps_per_episode, intial_positions,
+                 gamma=0.99, beta=0.01, t_max=5):
         super(Worker, self).__init__()
 
         # The environment
         self.env = MultiAgentGridEnv(
-            grid_file='grid_world_test.json',
-            coverage_radius=1,
-            max_steps_per_episode=50,
-            initial_positions=[(0, 0), (0, 1), (0, 2), (0, 3)]
+            grid_file=grid_file,
+            coverage_radius=coverage_radius,
+            max_steps_per_episode=max_steps_per_episode,
+            initial_positions=intial_positions
         )
 
         # Local model
@@ -104,7 +106,7 @@ class Worker(mp.Process):
 
     def run(self):
 
-        for _ in range(self.num_episode):
+        for episode in range(self.num_episode):
             # Resetting the environment
             global_state = self.env.reset()
 
@@ -137,7 +139,8 @@ class Worker(mp.Process):
                     actions[agent_id] = action
 
                 # Execurint actions
-                next_global_state, reward, done, _ = self.env.step(actions)
+                next_global_state, reward, done, _ = self.env.step(
+                    actions, t, episode)
 
                 # Storing reward for each agent in each timestep
                 for agent_id in range(self.num_agents):
@@ -209,16 +212,21 @@ class Worker(mp.Process):
             self.actor_optimizer.step()
 
         print(self.env.agent_positions)
+        print(self.env.coverage_grid)
 
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
+    grid_file = 'grid_world_test.json'
+    coverage_radius = 1
+    max_steps_per_episode = 50
+    initial_positions = [(0, 0), (0, 1)]
 
     env = MultiAgentGridEnv(
-        grid_file='grid_world_test.json',
-        coverage_radius=1,
-        max_steps_per_episode=50,
-        initial_positions=[(0, 1), (0, 2), (0, 3), (0, 4)]
+        grid_file=grid_file,
+        coverage_radius=coverage_radius,
+        max_steps_per_episode=max_steps_per_episode,
+        initial_positions=initial_positions
     )
 
     global_model = GlobalActorCritic(
@@ -233,7 +241,7 @@ if __name__ == '__main__':
     workers = []
     for worker_id in range(1):
         worker = Worker(
-            global_model, actor_optimizer, critic_optimizer, env.num_agents, num_episode=5000)
+            global_model, actor_optimizer, critic_optimizer, env.num_agents, 10, grid_file, coverage_radius, max_steps_per_episode, initial_positions)
         workers.append(worker)
         worker.start()
 
