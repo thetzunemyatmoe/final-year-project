@@ -214,32 +214,26 @@ class MultiAgentGridEnv:
         print(f'\nTotal area covered by UAV[{index}] is [{self.total_area}]')
         print(f'Overlap by UAV [{index}] is [{self.overlap}]')
 
-        # self.sensor_1s = self.calculate_sensor_penalty()
-        # self.sensor_penalty = self.sensor_1s * \
-        #     ((1 + 2*self.coverage_radius)**2)
+        self.sensor_1s = self.calculate_sensor_penalty(index)
+        self.sensor_penalty = self.sensor_1s * \
+            ((1 + 2*self.coverage_radius)**2)
 
         reward = (
             self.total_area
             - (0.75) * self.overlap
+            - self.sensor_penalty
         )
         print(f'Total reward by UAV [{index}] is [{reward}]')
         return reward
 
-    def calculate_sensor_penalty(self):
-        sensor_readings = self.get_sensor_readings()
+    def calculate_sensor_penalty(self, index):
+        readings = self.get_sensor_readings()[index]
         total_penalty = 0
-        for readings in sensor_readings:
-            # Sum up the number of 'blocked' directions (1's in the sensor reading)
-            penalty = sum(readings)
-            if penalty > 0:
-                total_penalty += 1
+        penalty = sum(readings)
+        if penalty > 0:
+            total_penalty += 1
 
         return total_penalty
-
-    # def areas_overlap(self, pos1, pos2):
-    #     x1, y1 = pos1
-    #     x2, y2 = pos2
-    #     return abs(x1 - x2) <= 2 * self.coverage_radius and abs(y1 - y2) <= 2 * self.coverage_radius
 
     def calculate_overlap(self):
         overlap_grid = np.zeros_like(self.coverage_grid)
@@ -267,10 +261,6 @@ class MultiAgentGridEnv:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
                     grid[ny, nx] += 1  # Increment instead of setting to 1
-
-    # ***********
-    # Reward Calculation end
-    # ***********
 
     def get_observations(self):
         observations = []
@@ -340,7 +330,7 @@ class MultiAgentGridEnv:
 
     # Can be useful for debugging
 
-    def get_metrics(self):
+    # def get_metrics(self):
         return {
             "Total Area": self.total_area,
             "Overlap Penalty": self.overlap_penalty,
