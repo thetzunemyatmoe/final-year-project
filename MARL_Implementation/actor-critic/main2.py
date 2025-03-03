@@ -196,27 +196,55 @@ class Worker(mp.Process):
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
 
-            # Loop over agents
+            total_loss = 0.0
             for agent_id in range(self.num_agents):
-                for t in reversed(range(self.t_max)):  # Backward through time
-                    # Compute actor and critic loss for this agent at timestep t
-                    actor_loss = actor_losses[agent_id][t]
-                    critic_loss = critic_losses[agent_id][t]
+                for t in range(self.t_max):
+                    advantage = returns[agent_id][t] - values[agent_id][t]
+                    actor_loss = - \
+                        log_probs[agent_id][t] * advantage - \
+                        self.beta * policy_entropies[agent_id][t]
+                    critic_loss = advantage.pow(2)
+                    total_loss += actor_loss + critic_loss
+            # Reset gradients once
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
 
-                    # Compute gradients separately
-                    critic_loss.backward(retain_graph=True)
-                    actor_loss.backward()
+            # Single backward pass over the total loss
+            total_loss.backward()
 
-                    # Accumulate gradients across all timesteps
-                    for local_param, global_param in zip(self.local_model.parameters(), self.global_model.parameters()):
-                        if local_param.grad is not None:
-                            if global_param.grad is None:
-                                global_param.grad = local_param.grad.clone()
-                            else:
-                                global_param.grad += local_param.grad.clone()
-            # Apply updates to global model
+            # Accumulate gradients from the local model to the global model
+            for local_param, global_param in zip(self.local_model.parameters(), self.global_model.parameters()):
+                if local_param.grad is not None:
+                    if global_param.grad is None:
+                        global_param.grad = local_param.grad.clone()
+                    else:
+                        global_param.grad += local_param.grad.clone()
+
+            # Update global model parameters
             self.critic_optimizer.step()
             self.actor_optimizer.step()
+
+            # # Loop over agents
+            # for agent_id in range(self.num_agents):
+            #     for t in reversed(range(self.t_max)):  # Backward through time
+            #         # Compute actor and critic loss for this agent at timestep t
+            #         actor_loss = actor_losses[agent_id][t]
+            #         critic_loss = critic_losses[agent_id][t]
+
+            #         # Compute gradients separately
+            #         critic_loss.backward(retain_graph=True)
+            #         actor_loss.backward()
+
+            #         # Accumulate gradients across all timesteps
+            #         for local_param, global_param in zip(self.local_model.parameters(), self.global_model.parameters()):
+            #             if local_param.grad is not None:
+            #                 if global_param.grad is None:
+            #                     global_param.grad = local_param.grad.clone()
+            #                 else:
+            #                     global_param.grad += local_param.grad.clone()
+            # Apply updates to global model
+            # self.critic_optimizer.step()
+            # self.actor_optimizer.step()
 
         print(self.env.agent_positions)
         print(self.env.coverage_grid)
@@ -259,7 +287,7 @@ if __name__ == '__main__':
     workers = []
     for worker_id in range(1):
         worker = Worker(
-            global_model, actor_optimizer, critic_optimizer, env.num_agents, 1000, grid_file, coverage_radius, initial_positions)
+            global_model, actor_optimizer, critic_optimizer, env.num_agents, 200, grid_file, coverage_radius, initial_positions)
         workers.append(worker)
         worker.start()
 
