@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 import numpy as np
 from environment import MultiAgentGridEnv
+import matplotlib.pyplot as plt
 
 
 class Actor(nn.Module):
@@ -68,7 +69,7 @@ class GlobalActorCritic(nn.Module):
 
 class Worker(mp.Process):
     def __init__(self,
-                 global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, grid_file, coverage_radius, max_steps_per_episode, intial_positions,
+                 global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, grid_file, coverage_radius, intial_positions,
                  gamma=0.99, beta=0.01, t_max=5):
         super(Worker, self).__init__()
 
@@ -76,7 +77,6 @@ class Worker(mp.Process):
         self.env = MultiAgentGridEnv(
             grid_file=grid_file,
             coverage_radius=coverage_radius,
-            max_steps_per_episode=max_steps_per_episode,
             initial_positions=intial_positions
         )
 
@@ -105,6 +105,7 @@ class Worker(mp.Process):
         self.local_model.load_state_dict(self.global_model.state_dict())
 
     def run(self):
+        self.episode_rewards = []
 
         for episode in range(self.num_episode):
             # Resetting the environment
@@ -119,6 +120,8 @@ class Worker(mp.Process):
             values = [[0]*self.t_max for _ in range(self.num_agents)]
             rewards = [[0]*self.t_max for _ in range(self.num_agents)]
 
+            episode_reward = 0
+
             # Collect mini-batch of experiences
             for t in range(self.t_max):
                 actions = [0] * self.num_agents
@@ -128,7 +131,7 @@ class Worker(mp.Process):
                     policy, value, policy_entropy = self.local_model(
                         global_state, global_state[agent_id])
 
-                    action = torch.argmax(policy, 0).item()
+                    action = torch.multinomial(policy, 1).item()
                     # Log probabiltiy and Entropy for actor loss in timestep t
                     log_probs[agent_id][t] = torch.log(policy[action])
                     policy_entropies[agent_id][t] = policy_entropy
@@ -139,22 +142,25 @@ class Worker(mp.Process):
                     actions[agent_id] = action
 
                 # Execurint actions
-                next_global_state, reward, done, _ = self.env.step(
+                next_global_state, reward, _ = self.env.step(
                     actions, t, episode)
 
                 # Storing reward for each agent in each timestep
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
                     rewards[agent_id][t] = reward[agent_id]
+                    # Add reward for this step
+                    episode_reward += reward[agent_id]
 
                 global_state = next_global_state
-
+            # Store total reward for this episode
+            self.episode_rewards.append(episode_reward)
             # Compute Advantage and Returns(Value)
             returns = [[0]*self.t_max for _ in range(self.num_agents)]
             for agent_id in range(self.num_agents):
                 # Value of the current state
-                R = 0 if done else self.local_model(
-                    global_state, global_state[agent_id])[1].item()
+                R = self.local_model(global_state, global_state[agent_id])[
+                    1].item()
 
                 # Calculating value of
                 for time, reward in reversed(list(enumerate(rewards[agent_id]))):
@@ -181,8 +187,9 @@ class Worker(mp.Process):
                     critic_losses[agent_id][time] = critic_loss
 
                     # Calculating actor loss
-                    actor_loss = log_probs[agent_id][time] * \
-                        advantage - policy_entropies[agent_id][time]
+                    actor_loss = -log_probs[agent_id][time] * advantage - \
+                        self.beta * policy_entropies[agent_id][time]
+
                     actor_losses[agent_id][time] = actor_loss
 
             # Resetting gradient
@@ -213,19 +220,30 @@ class Worker(mp.Process):
 
         print(self.env.agent_positions)
         print(self.env.coverage_grid)
+        # Plot rewards after training
+        self.plot_rewards()
+
+    def plot_rewards(self):
+        print(f'The total episode reward is {self.episode_rewards}')
+        plt.figure(figsize=(10, 5))
+        plt.plot(self.episode_rewards, label="Total Reward per Episode")
+        plt.xlabel("Episodes")
+        plt.ylabel("Total Reward")
+        plt.title("Training Reward Trend")
+        plt.legend()
+        plt.grid()
+        plt.show()
 
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
     grid_file = 'grid_world_test.json'
     coverage_radius = 1
-    max_steps_per_episode = 50
-    initial_positions = [(0, 0), (0, 1)]
+    initial_positions = [(0, 1), (4, 3)]
 
     env = MultiAgentGridEnv(
         grid_file=grid_file,
         coverage_radius=coverage_radius,
-        max_steps_per_episode=max_steps_per_episode,
         initial_positions=initial_positions
     )
 
@@ -241,7 +259,7 @@ if __name__ == '__main__':
     workers = []
     for worker_id in range(1):
         worker = Worker(
-            global_model, actor_optimizer, critic_optimizer, env.num_agents, 10, grid_file, coverage_radius, max_steps_per_episode, initial_positions)
+            global_model, actor_optimizer, critic_optimizer, env.num_agents, 1000, grid_file, coverage_radius, initial_positions)
         workers.append(worker)
         worker.start()
 

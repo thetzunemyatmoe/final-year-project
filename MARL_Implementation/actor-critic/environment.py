@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, initial_positions, reward_type='global'):
+    def __init__(self, grid_file, coverage_radius, initial_positions, reward_type='global'):
         # Load the grid from the JSON file
         self.grid = self.load_grid(grid_file)
 
@@ -15,7 +15,6 @@ class MultiAgentGridEnv:
 
         # Initialize instance variable
         self.coverage_radius = coverage_radius
-        self.max_steps_per_episode = max_steps_per_episode
         self.num_agents = len(initial_positions)
         self.initial_positions = initial_positions
         self.reward_type = reward_type
@@ -63,7 +62,10 @@ class MultiAgentGridEnv:
 
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
-        self.calculate_overlap()
+        print('\n- Initial State -\n')
+        print(self.agent_positions)
+        print(self.coverage_grid)
+        print('\n-----------------\n')
 
         return self.get_observations()
 
@@ -74,11 +76,19 @@ class MultiAgentGridEnv:
         # Resets the coverage grid to zero (No ares have been covered)
         self.coverage_grid = np.zeros_like(self.grid)
 
+        # print("The grid")
+        # print(self.grid)
+
+        # print("Coverage grid")
+        # print(self.coverage_grid)
+
         # Update coverage for each agent based on their current position
         for index, pos in enumerate(self.agent_positions):
             # Reset the total area for each agent after each step
             self.reward_track[index]['total_area'] = 0
             self.cover_area(index, pos)
+        # print("\nAfter covering")
+        # print(self.coverage_grid)
 
     def cover_area(self, index, position):
         '''
@@ -86,7 +96,7 @@ class MultiAgentGridEnv:
         '''
         # Extract the x and y coordinates of the agent's position
         x, y = position
-        # print(f'Positon grabbed {x}, {y}')
+
         for dx in range(-self.coverage_radius, self.coverage_radius + 1):
             for dy in range(-self.coverage_radius, self.coverage_radius + 1):
                 nx, ny = x + dx, y + dy
@@ -96,7 +106,12 @@ class MultiAgentGridEnv:
                     self.coverage_grid[ny, nx] = 1
                     self.reward_track[index]["total_area"] += 1
 
+        self.coverage_grid[y, x] = 8
+
     def step(self, actions, timestep, episode):
+        """
+            Executes a single step in the environment based on the agents' actions.
+        """
         print(f'Episode [{episode}] Timestep [{timestep}]')
         print(f'Positions before executing - {self.agent_positions}')
         action_dict = {
@@ -106,9 +121,7 @@ class MultiAgentGridEnv:
             3: "UP   ",
             4: "HOVER"
         }
-        """
-            Executes a single step in the environment based on the agents' actions.
-        """
+
         # Increment the step count
         self.current_step += 1
         log_action = ''
@@ -116,8 +129,6 @@ class MultiAgentGridEnv:
             log_action += action_dict[action] + "  |  "
 
         print(f'Actor chooses  --> |  {log_action}')
-
-        #
 
         new_positions = []
         actual_actions = []
@@ -130,6 +141,10 @@ class MultiAgentGridEnv:
             new_pos = self.get_new_position(self.agent_positions[i], action)
             new_positions.append(new_pos)
             actual_actions.append(action)
+
+        # print("Before validation")
+        # print(new_positions)
+        # print(actual_actions)
 
         # Then, validate moves and update positions
         for i, new_pos in enumerate(new_positions):
@@ -144,35 +159,36 @@ class MultiAgentGridEnv:
 
         # Update the evnrionment with the new validated positions
         self.agent_positions = new_positions
-        print(f'Actual chooses --> |  {log_action}')
-        print(f'Positions after  executing - {self.agent_positions}')
+        # print(f'Actual chooses --> |  {log_action}')
+        # print(f'Positions after  executing - {self.agent_positions}')
 
         # Update the coverage gird based on the new validated positions
         self.update_coverage()
         self.calculate_overlap()
 
         print(self.coverage_grid)
+        print("---------------\n")
+        print(self.reward_track)
         # Calculate the global reward for the current step
         # global_reward = self.calculate_global_reward()
         rewards = []
         for index in range(self.num_agents):
             rewards.append(self.calculate_individual_reward(index))
 
-        # Check if the maximun allowed steps reached
-        done = self.current_step >= self.max_steps_per_episode
+        for index, reward in enumerate(rewards):
+            print(f'UAV[{index}] has reward[{reward}]')
         print('\n-------------------------------------------------------\n')
-        self.render()
-        return self.get_observations(), rewards, done, actual_actions
+        return self.get_observations(), rewards, actual_actions
 
     def get_new_position(self, position, action):
         x, y = position
-        if action == 0:  # X - RIGHT
+        if action == 0:  # forward (positive x)
             return (min(x + 1, self.grid_width - 1), y)
-        elif action == 1:  # X - LEFT
+        elif action == 1:  # backward (negative x)
             return (max(x - 1, 0), y)
-        elif action == 2:  # Y - DOWN
+        elif action == 2:  # left (positive y)
             return (x, min(y + 1, self.grid_height - 1))
-        elif action == 3:  # Y - UP
+        elif action == 3:  # right (negative y)
             return (x, max(y - 1, 0))
         else:  # stay
             return (x, y)
@@ -211,12 +227,13 @@ class MultiAgentGridEnv:
         self.total_area = self.reward_track[index]["total_area"]
         self.overlap = self.reward_track[index]["overlap"]
 
-        print(f'\nTotal area covered by UAV[{index}] is [{self.total_area}]')
-        print(f'Overlap by UAV [{index}] is [{self.overlap}]')
-
         self.sensor_1s = self.calculate_sensor_penalty(index)
         self.sensor_penalty = self.sensor_1s * \
             ((1 + 2*self.coverage_radius)**2)
+
+        print(f'\nTotal area covered by UAV[{index}] is [{self.total_area}]')
+        print(f'Overlap by UAV [{index}] is [{self.overlap}]')
+        print(f'Sensor penalty by UAV[{index}] is [{self.sensor_penalty}]')
 
         reward = (
             self.total_area
