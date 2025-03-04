@@ -69,6 +69,10 @@ class MultiAgentGridEnv:
 
         return self.get_observations()
 
+    # ***********
+    # Update MDP after each step
+    # ***********
+
     def update_coverage(self):
         """
             Updates the coverage grid based on the current positions of all agents
@@ -178,20 +182,8 @@ class MultiAgentGridEnv:
         for index, reward in enumerate(rewards):
             print(f'UAV[{index}] has reward[{reward}]')
         print('\n-------------------------------------------------------\n')
+        # self.render()
         return self.get_observations(), rewards, actual_actions
-
-    def get_new_position(self, position, action):
-        x, y = position
-        if action == 0:  # forward (positive x)
-            return (min(x + 1, self.grid_width - 1), y)
-        elif action == 1:  # backward (negative x)
-            return (max(x - 1, 0), y)
-        elif action == 2:  # left (positive y)
-            return (x, min(y + 1, self.grid_height - 1))
-        elif action == 3:  # right (negative y)
-            return (x, max(y - 1, 0))
-        else:  # stay
-            return (x, y)
 
     def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
@@ -243,6 +235,7 @@ class MultiAgentGridEnv:
         print(f'Total reward by UAV [{index}] is [{reward}]')
         return reward
 
+    # Calculate sensor penalty for specific UAV
     def calculate_sensor_penalty(self, index):
         readings = self.get_sensor_readings()[index]
         total_penalty = 0
@@ -252,6 +245,7 @@ class MultiAgentGridEnv:
 
         return total_penalty
 
+    # Calculate overlap for each UAV
     def calculate_overlap(self):
         overlap_grid = np.zeros_like(self.coverage_grid)
         for pos in self.agent_positions:
@@ -278,6 +272,22 @@ class MultiAgentGridEnv:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
                     grid[ny, nx] += 1  # Increment instead of setting to 1
+
+    # ***********
+    # Getter Functions
+    # ***********
+    def get_new_position(self, position, action):
+        x, y = position
+        if action == 0:  # forward (positive x)
+            return (min(x + 1, self.grid_width - 1), y)
+        elif action == 1:  # backward (negative x)
+            return (max(x - 1, 0), y)
+        elif action == 2:  # left (positive y)
+            return (x, min(y + 1, self.grid_height - 1))
+        elif action == 3:  # right (negative y)
+            return (x, max(y - 1, 0))
+        else:  # stay
+            return (x, y)
 
     def get_observations(self):
         observations = []
@@ -318,12 +328,6 @@ class MultiAgentGridEnv:
             observations.append(np.array(obs, dtype=np.float32))
         return observations
 
-    def get_obs_size(self):
-        return self.obs_size
-
-    def get_total_actions(self):
-        return 5  # forward, backward, left, right, stay
-
     def get_sensor_readings(self):
         readings = []
         for pos in self.agent_positions:
@@ -345,18 +349,24 @@ class MultiAgentGridEnv:
             readings.append(reading)
         return readings
 
+    def get_obs_size(self):
+        return self.obs_size
+
+    def get_total_actions(self):
+        return 5  # forward, backward, left, right, stay
+
     # Can be useful for debugging
 
-    # def get_metrics(self):
-        return {
-            "Total Area": self.total_area,
-            "Overlap Penalty": self.overlap_penalty,
-            "Connectivity Penalty": self.connectivity_penalty,
-            "Hole Penalty": self.hole_penalty,
-            "Number of Components": self.num_components,
-            "Number of Holes": len(self.find_chordless_cycles(self.build_graph())),
-            "Reward": self.total_area - self.overlap_penalty - self.connectivity_penalty - self.hole_penalty
-        }
+    # # def get_metrics(self):
+    #     return {
+    #         "Total Area": self.total_area,
+    #         "Overlap Penalty": self.overlap_penalty,
+    #         "Connectivity Penalty": self.connectivity_penalty,
+    #         "Hole Penalty": self.hole_penalty,
+    #         "Number of Components": self.num_components,
+    #         "Number of Holes": len(self.find_chordless_cycles(self.build_graph())),
+    #         "Reward": self.total_area - self.overlap_penalty - self.connectivity_penalty - self.hole_penalty
+    #     }
 
     def render(self, ax=None, actions=None, step=None, return_rgb=False):
         if ax is None:

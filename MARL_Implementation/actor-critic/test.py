@@ -6,7 +6,7 @@
 #   4: "HOVER"
 
 from environment import MultiAgentGridEnv
-grid_file = 'grid_world_test.json'
+grid_file = 'grid_world.json'
 coverage_radius = 1
 max_steps_per_episode = 50
 initial_positions = [(0, 1), (4, 3)]
