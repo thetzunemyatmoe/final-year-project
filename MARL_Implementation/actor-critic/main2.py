@@ -5,7 +5,6 @@ import torch.multiprocessing as mp
 import numpy as np
 from environment import MultiAgentGridEnv
 import matplotlib.pyplot as plt
-import time
 
 
 class Actor(nn.Module):
@@ -39,7 +38,6 @@ class GlobalActorCritic(nn.Module):
     def __init__(self, actor_input_size, critic_input_size, action_size):
         super(GlobalActorCritic, self).__init__()
 
-        # Single shared actor and critic for all agents
         self.actor = Actor(actor_input_size, action_size)
         self.critic = Critic(critic_input_size)
 
@@ -71,7 +69,7 @@ class GlobalActorCritic(nn.Module):
 class Worker(mp.Process):
     def __init__(self,
                  global_model, actor_optimizer, critic_optimizer, num_agents, num_episode, grid_file, coverage_radius, intial_positions,
-                 gamma=0.99, beta=0.01, t_max=5):
+                 gamma=0.99, beta=0.01, t_max=10):
         super(Worker, self).__init__()
 
         # The environment
