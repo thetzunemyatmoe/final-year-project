@@ -62,10 +62,10 @@ class MultiAgentGridEnv:
 
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
-        print('\n- Initial State -\n')
-        print(self.agent_positions)
-        print(self.coverage_grid)
-        print('\n-----------------\n')
+        # print('\n- Initial State -\n')
+        # print(self.agent_positions)
+        # print(self.coverage_grid)
+        # print('\n-----------------\n')
 
         return self.get_observations()
 
@@ -116,8 +116,8 @@ class MultiAgentGridEnv:
         """
             Executes a single step in the environment based on the agents' actions.
         """
-        print(f'Episode [{episode}] Timestep [{timestep}]')
-        print(f'Positions before executing - {self.agent_positions}')
+        # print(f'Episode [{episode}] Timestep [{timestep}]')
+        # print(f'Positions before executing - {self.agent_positions}')
         action_dict = {
             0: "RIGHT",
             1: "LEFT ",
@@ -132,7 +132,7 @@ class MultiAgentGridEnv:
         for action in actions:
             log_action += action_dict[action] + "  |  "
 
-        print(f'Actor chooses  --> |  {log_action}')
+        # print(f'Actor chooses  --> |  {log_action}')
 
         new_positions = []
         actual_actions = []
@@ -170,18 +170,18 @@ class MultiAgentGridEnv:
         self.update_coverage()
         self.calculate_overlap()
 
-        print(self.coverage_grid)
-        print("---------------\n")
-        print(self.reward_track)
+        # print(self.coverage_grid)
+        # print("---------------\n")
+        # print(self.reward_track)
         # Calculate the global reward for the current step
         # global_reward = self.calculate_global_reward()
         rewards = []
         for index in range(self.num_agents):
             rewards.append(self.calculate_individual_reward(index))
 
-        for index, reward in enumerate(rewards):
-            print(f'UAV[{index}] has reward[{reward}]')
-        print('\n-------------------------------------------------------\n')
+        # for index, reward in enumerate(rewards):
+        #     print(f'UAV[{index}] has reward[{reward}]')
+        # print('\n-------------------------------------------------------\n')
         # self.render()
         return self.get_observations(), rewards, actual_actions
 
@@ -223,16 +223,16 @@ class MultiAgentGridEnv:
         self.sensor_penalty = self.sensor_1s * \
             ((1 + 2*self.coverage_radius)**2)
 
-        print(f'\nTotal area covered by UAV[{index}] is [{self.total_area}]')
-        print(f'Overlap by UAV [{index}] is [{self.overlap}]')
-        print(f'Sensor penalty by UAV[{index}] is [{self.sensor_penalty}]')
+        # print(f'\nTotal area covered by UAV[{index}] is [{self.total_area}]')
+        # print(f'Overlap by UAV [{index}] is [{self.overlap}]')
+        # print(f'Sensor penalty by UAV[{index}] is [{self.sensor_penalty}]')
 
         reward = (
             self.total_area
             - (0.75) * self.overlap
             - self.sensor_penalty
         )
-        print(f'Total reward by UAV [{index}] is [{reward}]')
+        # print(f'Total reward by UAV [{index}] is [{reward}]')
         return reward
 
     # Calculate sensor penalty for specific UAV

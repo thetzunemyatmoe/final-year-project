@@ -21,7 +21,7 @@ class GymNav(gym.Env):
 
         self.pos = []
         self.target_goal = []
-        for i in range(self.number_of_agents):
+        for _ in range(self.number_of_agents):
             self.pos += [[]]
         self.timer = 0
 
@@ -33,14 +33,16 @@ class GymNav(gym.Env):
         # The Space object corresponding to valid actions
         self.action_space = gym.spaces.Tuple(
             [gym.spaces.Discrete(self.max_actions) for _ in range(self.number_of_agents)])
-        # (gym.spaces.Discrete(self.max_actions), gym.spaces.Discrete(self.max_actions)))
-        # The Space object corresponding to valid observations
+
+        # the format and range of the observations the agents will receive from the environment
+        # each row corresponds to one agent
+        # each column corresponds to observation consisting of two values.
         self.observation_space = gym.spaces.Box(
             low=-5.0, high=5.0, shape=(self.number_of_agents, 2))
 
-        self.agent_observation_space = [2 + 2 * number_of_agents]
-        self.central_observation_space = [
-            2 * number_of_agents + 2 * number_of_agents]
+        self.agent_observation_space = 2 + 2 * number_of_agents
+        self.central_observation_space = 2 * number_of_agents + 2 * number_of_agents
+
         self.agent_action_space = self.max_actions
 
         # A tuple corresponding to the min and max possible rewards
@@ -84,14 +86,19 @@ class GymNav(gym.Env):
 
     def reset(self):
         self.target_goal = []
+
+        # Setting target (for each agent)
         for i in range(self.number_of_agents):
             possible_pos = [random.randint(
                 0, self.map_size - 1), random.randint(0, self.map_size - 1)]
+
             while possible_pos in self.target_goal:
                 possible_pos = [random.randint(
                     0, self.map_size - 1), random.randint(0, self.map_size - 1)]
+
             self.target_goal.append(possible_pos)
 
+        # Setting initial postion (for each agent)
         for i in range(self.number_of_agents):
             possible_pos = [random.randint(
                 0, self.map_size - 1), random.randint(0, self.map_size - 1)]
@@ -105,7 +112,7 @@ class GymNav(gym.Env):
         return self.get_state(), {"state_central": self.get_state_central()}
 
     def step(self, action):
-        reward = 0
+        reward = []
         for i, action in enumerate(action):
             if action == 0:
                 mov = [0, 1]
@@ -124,17 +131,18 @@ class GymNav(gym.Env):
             min_dist = self.map_size
             for i in range(self.number_of_agents):
                 min_dist = min(min_dist, dist(self.pos[i], obstacle))
-            reward += (self.map_size / 2 - min_dist) / (self.map_size / 2)
+            reward.append((self.map_size / 2 - min_dist) / (self.map_size / 2))
 
         terminal = self.timer >= self.max_step_limit or reward == self.number_of_agents
-        if not terminal:
-            reward = 0
+        if terminal:
+            reward = [0, 0, 0, 0]
 
         self.timer += 1
 
         return self.get_state(), reward, terminal, {"state_central": self.get_state_central()}
 
     def get_state_central(self):
+        # Central state includes each agent postion and each target position
         central_state = []
         for x in self.pos:
             central_state.extend(x)
@@ -143,20 +151,17 @@ class GymNav(gym.Env):
 
         return [central_state for _ in range(self.number_of_agents)]
 
-    # computes the circle's observations
     def get_state(self):
-        # print(self.target_goal, self.pos)
+        # each partial observation include corresponding agent postion and the positions of all targets
         obs = []
         for index, pos in enumerate(self.pos):
+
             state = list(pos)
             for x in self.target_goal:
                 state.extend(x)
             obs.append(state)
 
         return obs
-
-    def close(self):
-        return
 
     def seed(self, seed=None):
         if seed is None:
@@ -168,6 +173,3 @@ class GymNav(gym.Env):
 # manhattan distance
 def dist(a, b):
     return np.abs(a[0] - b[0]) + np.abs(a[1] - b[1])
-
-
-env = GymNav()

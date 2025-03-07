@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.multiprocessing as mp
 import numpy as np
-from environment import MultiAgentGridEnv
 import matplotlib.pyplot as plt
 import math
+from simulator.GymNavigation import GymNav
 
 
 class Actor(nn.Module):
@@ -64,8 +64,9 @@ class GlobalActorCritic(nn.Module):
         self.critic = Critic(critic_input_size)
 
     def forward(self, global_obs, partial_obs):
+
         # Critic
-        global_obs = [i for obv in global_obs for i in obv]
+        # global_obs = [i for obv in global_obs for i in obv]
         global_state = torch.tensor(global_obs, dtype=torch.float32)
         value = self.critic(global_state)  # Shared centralized critic
 
@@ -95,17 +96,13 @@ class Worker(mp.Process):
         super(Worker, self).__init__()
 
         # The environment
-        self.env = MultiAgentGridEnv(
-            grid_file=grid_file,
-            coverage_radius=coverage_radius,
-            initial_positions=intial_positions
-        )
+        self.env = GymNav()
 
         # Local model
         self.local_model = GlobalActorCritic(
-            actor_input_size=self.env.get_obs_size(),
-            critic_input_size=self.env.get_obs_size() * env.num_agents,
-            action_size=self.env.get_total_actions())
+            actor_input_size=self.env.agent_observation_space,
+            critic_input_size=self.env.central_observation_space,
+            action_size=self.env.agent_action_space)
 
         # Global model
         self.global_model = global_model
@@ -115,7 +112,7 @@ class Worker(mp.Process):
         self.critic_optimizer = critic_optimizer
 
         # Variables
-        self.num_agents = num_agents
+        self.num_agents = self.env.number_of_agents
         self.gamma = gamma
         self.beta = beta
         self.t_max = t_max
@@ -128,9 +125,12 @@ class Worker(mp.Process):
     def run(self):
         self.episode_rewards = []
 
+        print(f'T_max {self.t_max}')
         for episode in range(self.num_episode):
             # Resetting the environment
-            global_state = self.env.reset()
+            agent_states, global_state = self.env.reset()
+
+            global_state = global_state['state_central']
 
             # Synchronzie local model with global model
             self.sync_local_with_global()
@@ -146,13 +146,14 @@ class Worker(mp.Process):
             ################
             # Collecting Mini batch
             ################
+
             for t in range(self.t_max):
                 actions = [0] * self.num_agents
                 # Actions selection (From actor)
                 for agent_id in range(self.num_agents):
                     # Feed the global state and partial observation the local model
                     policy, value, policy_entropy = self.local_model(
-                        global_state, global_state[agent_id])
+                        global_state[agent_id], agent_states[agent_id])
 
                     action = torch.multinomial(policy, 1).item()
                     # Log probabiltiy and Entropy for actor loss in timestep t
@@ -164,20 +165,22 @@ class Worker(mp.Process):
                     # Actions chosen
                     actions[agent_id] = action
 
+                print('Action are ', t)
                 # Execurint actions
-                next_global_state, reward, _ = self.env.step(
-                    actions, t, episode)
+                next_agent__states, reward, _, next_global_state = self.env.step(
+                    actions)
 
                 # Storing reward for each agent in each timestep
                 for agent_id in range(self.num_agents):
                     # Separate reward per agent
                     rewards[agent_id][t] = reward[agent_id]
                     # Add reward for this step
-                episode_reward += math.ceil(sum(reward) / self.num_agents)
+                    episode_reward += reward[agent_id]
 
-                global_state = next_global_state
+                global_state = next_global_state['state_central']
+                agent_states = next_agent__states
             # Store total reward for this episode
-            self.episode_rewards.append(episode_reward / self.t_max)
+            self.episode_rewards.append(episode_reward)
 
             ################
             # Compute state of the values in each step
@@ -185,7 +188,7 @@ class Worker(mp.Process):
             returns = [[0]*self.t_max for _ in range(self.num_agents)]
             for agent_id in range(self.num_agents):
                 # Value of the current state
-                R = self.local_model(global_state, global_state[agent_id])[
+                R = self.local_model(global_state[agent_id], agent_states[agent_id])[
                     1].item()
 
                 # Calculating value of each state
@@ -257,25 +260,22 @@ if __name__ == '__main__':
     coverage_radius = 1
     initial_positions = [(0, 1), (4, 3)]  # Two agents
 
-    env = MultiAgentGridEnv(
-        grid_file=grid_file,
-        coverage_radius=coverage_radius,
-        initial_positions=initial_positions
-    )
+    env = GymNav()
 
     global_model = GlobalActorCritic(
-        actor_input_size=env.get_obs_size(),
-        critic_input_size=env.get_obs_size() * env.num_agents,
-        action_size=env.get_total_actions())
+        actor_input_size=env.agent_observation_space,
+        critic_input_size=env.central_observation_space,
+        action_size=env.agent_action_space)
+
     global_model.share_memory()
 
     actor_optimizer = optim.Adam(global_model.get_actor_params(), lr=0.0001)
     critic_optimizer = optim.Adam(global_model.get_critic_params(), lr=0.0001)
 
     workers = []
-    for worker_id in range(3):
+    for worker_id in range(1):
         worker = Worker(
-            global_model, actor_optimizer, critic_optimizer, env.num_agents, 1000, grid_file, coverage_radius, initial_positions)
+            global_model, actor_optimizer, critic_optimizer, env.number_of_agents, 1000, grid_file, coverage_radius, initial_positions)
         workers.append(worker)
         worker.start()
 
