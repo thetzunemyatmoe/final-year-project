@@ -11,10 +11,12 @@ class Actor(nn.Module):
     def __init__(self, input_size, action_size):
         super(Actor, self).__init__()
         self.actor = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(input_size, 20),  # First hidden layer (20 neurons)
             nn.ReLU(),
-            nn.Linear(128, action_size),
-            nn.Softmax(dim=-1)
+            nn.Linear(20, 10),         # Second hidden layer (10 neurons)
+            nn.ReLU(),
+            nn.Linear(10, action_size),  # Output layer (action_size neurons)
+            nn.Softmax(dim=-1)          # Probability distribution over actions
         )
 
     def forward(self, state):
@@ -25,9 +27,12 @@ class Critic(nn.Module):
     def __init__(self, input_size):
         super(Critic, self).__init__()
         self.critic = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(input_size, 20),  # First hidden layer (20 neurons)
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(20, 10),         # Second hidden layer (10 neurons)
+            nn.ReLU(),
+            # Output layer (1 neuron for state value)
+            nn.Linear(10, 1)
         )
 
     def forward(self, global_obs):
