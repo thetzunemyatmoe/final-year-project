@@ -1,0 +1,46 @@
+[Initial step]
+
+  [2 2 0]
+  [2 2 0]
+  [1 1 0]
+  - Total coverage --> 10
+  - Squared coverage --> 18
+  - Num_PoIs --> 64
+
+
+------
+[Right and Right]
+  [4 4 2]
+  [4 4 2]
+  [2 2 1]
+  - Total coverage --> 25
+  - Squared coverage --> 81
+  - Num_PoIs --> 64
+  - Fairness --> 0.12
+------
+[Right and Right]
+  [4 6 4 2] 
+  [4 6 4 2]
+  [2 3 2 1]
+  - Total coverage --> 40
+  - Squared coverage --> 162
+  - Num_PoIs --> 64
+  - Fairness --> 0.15
+------
+[Right and Right]
+  [4 6 6 4 2]
+  [4 6 6 4 2]
+  [2 3 3 2 1]
+  - Total coverage --> 55
+  - Squared coverage --> 243
+  - Num_PoIs --> 64
+  - Fairness --> 0.19
+------
+[Hover and Hover]
+  [4 6 8 6 4]
+  [4 6 8 6 4]
+  [2 3 4 3 2]
+  - Total coverage --> 70
+  - Squared coverage --> 378
+  - Num_PoIs --> 64
+  - Fairness --> 0.20

@@ -273,7 +273,7 @@ if __name__ == '__main__':
     critic_optimizer = optim.Adam(global_model.get_critic_params(), lr=0.0001)
 
     workers = []
-    for worker_id in range(3):
+    for worker_id in range(mp.cpu_count()):
         worker = Worker(
             global_model, actor_optimizer, critic_optimizer, env.num_agents, 1000, grid_file, coverage_radius, initial_positions)
         workers.append(worker)

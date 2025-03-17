@@ -15,33 +15,35 @@ def set_init(layers):
         nn.init.constant_(layer.bias, 0.)
 
 
-def push_and_pull(opt, lnet, gnet, done, s_, bs, ba, br, gamma):
+def push_and_pull(opt, local_model, gloabl_model, done, s_, bs, ba, br, gamma):
+    # Terminal state
     if done:
-        v_s_ = 0.               # terminal
+        v_s_ = 0.
     else:
-        v_s_ = lnet.forward(v_wrap(s_[None, :]))[-1].data.numpy()[0, 0]
+        v_s_ = local_model.forward(v_wrap(s_[None, :]))[-1].data.numpy()[0, 0]
 
     buffer_v_target = []
-    for r in br[::-1]:    # reverse buffer r
+    # Reverese iteraction
+    for r in br[::-1]:
         v_s_ = r + gamma * v_s_
         buffer_v_target.append(v_s_)
     buffer_v_target.reverse()
 
-    loss = lnet.loss_func(
+    # Local loss
+    loss = local_model.loss_func(
         v_wrap(np.vstack(bs)),
-        v_wrap(np.array(ba), dtype=np.int64) if ba[0].dtype == np.int64 else v_wrap(
-            np.vstack(ba)),
+        v_wrap(np.array(ba), dtype=np.int64),
         v_wrap(np.array(buffer_v_target)[:, None]))
 
-    # calculate local gradients and push local parameters to global
+    # Calculate local gradients and push local parameters to global
     opt.zero_grad()
     loss.backward()
-    for lp, gp in zip(lnet.parameters(), gnet.parameters()):
+    for lp, gp in zip(local_model.parameters(), gloabl_model.parameters()):
         gp._grad = lp.grad
     opt.step()
 
     # pull global parameters
-    lnet.load_state_dict(gnet.state_dict())
+    local_model.load_state_dict(gloabl_model.state_dict())
 
 
 def record(global_ep, global_ep_r, ep_r, res_queue, name):
