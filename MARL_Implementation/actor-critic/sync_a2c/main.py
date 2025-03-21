@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from new_env import MultiAgentGridEnv
+from env import MultiAgentGridEnv
 import numpy as np
 import random
 import torch
@@ -11,17 +11,16 @@ from Networks import Actor, Critic
 
 
 gamma = 0.99
-num_envs = 5  # Number of parallel environments
+num_envs = 4  # Number of parallel environments
 max_episode = 100  # Number of timesteps per rollout
 
-initial_positions = [(0, 0), (0, 7), (3, 3), (7, 0), (7, 7)]
 # Initialize K parallel environments
-envs = [MultiAgentGridEnv(grid_file="grid_world.json", coverage_radius=1, max_steps_per_episode=200,
-                          num_agents=1, initial_positions=[initial_positions[index]]) for index in range(num_envs)]
+envs = [MultiAgentGridEnv(grid_file="grid_world.json", coverage_radius=2, max_steps_per_episode=100,
+                          num_agents=1, initial_positions=[(5, 5)]) for _ in range(num_envs)]
 
 actor = Actor(envs[0].get_obs_size(), envs[0].get_total_actions())
 critic = Critic(envs[0].get_obs_size())
-actor_optim = optim.Adam(actor.parameters(), lr=0.0005)
+actor_optim = optim.Adam(actor.parameters(), lr=0.001)
 critic_optim = optim.Adam(critic.parameters(), lr=0.001)
 
 
@@ -62,8 +61,8 @@ def all_step(envs, actions):
     return next_states, rewards, done
 
 
-def calculate_loss(states, actions, rewards, done, next_states, beta=0.1):
-    actor_loss, critic_loss, entropy_loss = 0, 0, 0
+def calculate_loss(states, actions, rewards, done, next_states):
+    actor_loss, critic_loss = 0, 0
 
     for index, env in enumerate(envs):
         for agent_index in range(env.num_agents):
@@ -72,7 +71,7 @@ def calculate_loss(states, actions, rewards, done, next_states, beta=0.1):
             next_state = torch.tensor(
                 next_states[index][agent_index], dtype=torch.float32)
             reward = torch.tensor(
-                rewards[index], dtype=torch.float32)  # shape [1]
+                [rewards[index]], dtype=torch.float32)  # shape [1]
             done_tensor = torch.tensor([done], dtype=torch.float32)
 
             # Values
@@ -92,13 +91,10 @@ def calculate_loss(states, actions, rewards, done, next_states, beta=0.1):
             selected_action = torch.tensor(
                 actions[index][agent_index], dtype=torch.int64)
             log_prob = dist.log_prob(selected_action)
-            entropy = dist.entropy()
 
             actor_loss += -log_prob * advantage.detach()
-            entropy_loss += entropy
 
-    total_actor_loss = actor_loss - beta * entropy_loss
-    return total_actor_loss, critic_loss
+    return actor_loss, critic_loss
 
     # Repeat for every episode
 for episode in range(max_episode):
@@ -108,6 +104,7 @@ for episode in range(max_episode):
     done = False
     episodic_rewards = [0.0 for _ in range(num_envs)]
 
+    i = 0
     # for time step t = 0, 1, 2, . . . do
     while not done:
 
@@ -135,8 +132,8 @@ for episode in range(max_episode):
         critic_optim.step()
 
         states = next_states
+        i += 1
 
-    # Print episodic results
-    print(envs[2].poi_coverage_counter)
+      # Print episodic results
     avg_reward = sum(episodic_rewards) / num_envs
     print(f"Episode {episode} finished. Avg Reward: {avg_reward:.2f}")
