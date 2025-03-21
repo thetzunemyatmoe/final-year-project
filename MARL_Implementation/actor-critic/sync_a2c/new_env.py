@@ -260,11 +260,12 @@ class MultiAgentGridEnv:
                     if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height:
                         obs.extend([
                             self.coverage_grid[ny, nx],
-                            self.grid[ny, nx]
+                            self.poi_coverage_counter[ny,
+                                                      nx]/self.max_steps_per_episode
                         ])
                     else:
                         # Treat out-of-bounds as uncovered and obstacle
-                        obs.extend([0, 1])
+                        obs.extend([0, -1])
 
             # Relative positions of nearby agents
             for j, other_pos in enumerate(self.agent_positions):
