@@ -10,7 +10,7 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(128, num_actions)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
+        x = F.tanh(self.fc1(x))
         x = F.softmax(self.fc2(x), dim=-1)
         return x
 
@@ -24,6 +24,6 @@ class Critic(nn.Module):
         self.fc2 = nn.Linear(128, 1)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
+        x = F.tanh(self.fc1(x))
         x = self.fc2(x)
         return x

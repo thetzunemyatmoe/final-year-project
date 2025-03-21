@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from new_env import MultiAgentGridEnv
+from global_env import MultiAgentGridEnv
 import numpy as np
 import random
 import torch
@@ -62,7 +62,7 @@ def all_step(envs, actions):
     return next_states, rewards, done
 
 
-def calculate_loss(states, actions, rewards, done, next_states, beta=0.1):
+def calculate_loss(states, actions, rewards, done, next_states, beta=0.5):
     actor_loss, critic_loss, entropy_loss = 0, 0, 0
 
     for index, env in enumerate(envs):
@@ -98,6 +98,7 @@ def calculate_loss(states, actions, rewards, done, next_states, beta=0.1):
             entropy_loss += entropy
 
     total_actor_loss = actor_loss - beta * entropy_loss
+
     return total_actor_loss, critic_loss
 
     # Repeat for every episode
@@ -105,6 +106,7 @@ for episode in range(max_episode):
 
     # Observe a batch of current states for all environments
     states = env_reset(envs)
+
     done = False
     episodic_rewards = [0.0 for _ in range(num_envs)]
 
