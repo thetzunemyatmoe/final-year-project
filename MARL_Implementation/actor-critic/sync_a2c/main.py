@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from env import MultiAgentGridEnv
+from original_env import MultiAgentGridEnv
 import numpy as np
 import random
 import torch

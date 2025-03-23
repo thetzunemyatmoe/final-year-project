@@ -15,16 +15,17 @@ class MultiAgentGridEnv:
 
         # Initialize instance variable
         self.coverage_radius = coverage_radius
-        self.num_agents = 1
+        self.num_agents = len(initial_positions)
 
         self.total_cells = self.grid_height * self.grid_width
 
         # Calculate new obs_size for local rich observations
         self.central_state_size = 2*self.total_cells
+        self.partial_state_size = 2 * (self.coverage_radius*2 + 1)**2
 
-        self.initial_positions = initial_positions[0]
+        self.initial_positions = initial_positions
 
-        self.max_step = 200
+        self.max_step = 100
 
     def load_grid(self, filename):
         with open(filename, 'r') as f:
@@ -41,8 +42,8 @@ class MultiAgentGridEnv:
         # Track coverage for each PoI
         self.poi_coverage_counter = np.zeros_like(self.grid)
         self.update_coverage()
-        self.get_local_state(self.initial_positions)
-        return np.array(self.get_central_state())
+
+        return self.get_local_state(), self.get_central_state()
 
     # ***********
     # Update MDP after each step
@@ -50,7 +51,8 @@ class MultiAgentGridEnv:
 
     def update_coverage(self):
         self.coverage_grid = np.zeros_like(self.grid)
-        self.cover_area(self.agent_positions)
+        for pos in self.agent_positions:
+            self.cover_area(pos)
 
     def cover_area(self, position):
         x, y = position
@@ -62,24 +64,43 @@ class MultiAgentGridEnv:
                     self.coverage_grid[ny, nx] = 1
                     self.poi_coverage_counter[ny, nx] += 1
 
-    def step(self, action):
+    def step(self, actions):
+        # Increment counter
         self.current_step += 1
+
+        # Sensor reading of each UAV
         sensor_readings = self.get_sensor_readings()
 
-        new_pos = self.get_new_position(self.agent_positions, action)
+        #
+        new_positions = []
+        actual_actions = []
 
-        # Validating the move
-        if not self.is_valid_move(new_pos, sensor_readings, action):
-            new_pos = self.agent_positions
+        # Calculate all new positions
+        for i, action in enumerate(actions):
+            new_pos = self.get_new_position(self.agent_positions[i], action)
+            new_positions.append(new_pos)
+            actual_actions.append(action)
 
-        self.agent_positions = new_pos
+        # Penalty for choosing invalid choice
+        penalties = [0 for _ in range(self.num_agents)]
+        # Validate moves and update positions
+        for i, new_pos in enumerate(new_positions):
+            if not self.is_valid_move(new_pos, sensor_readings[i], actual_actions[i], new_positions[:i] + new_positions[i+1:]):
+                new_positions[i] = self.agent_positions[i]
+                actual_actions[i] = 4  # Stay action
+                penalties[i] = 5
 
-        # Coverage score on step t-1
+        print(f'Penalties are {penalties}')
+        # Set new postions
+        self.agent_positions = new_positions
+
+        # Coverage score on step t-1 (Before updating the coverage state)
         previous_coverage_score = self.poi_coverage_counter / self.max_step
 
+        # Update coverage state and coverage score
         self.update_coverage()
 
-        # Coverage score of each PoI
+        # Coverage score on step t (After upating the coverage state)
         coverage_score = self.poi_coverage_counter / self.max_step
 
         # Fairness Index
@@ -91,40 +112,53 @@ class MultiAgentGridEnv:
 
         self.max_fi = max(self.max_fi, fairness_index)
 
-        # Incremental Coverage (Δc_k)
+        # Incremental Coverage
         delta_coverage = np.sum(coverage_score - previous_coverage_score)
 
-        # Energy Consumption (Δe_i) Placeholder
+        # Incremental Energy Consumption
         delta_energy = 1  # TODO implement the incremental energy consumption
 
+        # Global reward
         reward = fairness_index * delta_coverage
 
+        rewards = []
+        # Local reward for each UAV
+        for penalty in penalties:
+            local_reward = (reward / self.num_agents) - penalty
+            rewards.append(local_reward)
+
+        print(rewards)
+
+        # Termianl state?
         done = self.current_step >= self.max_step
 
-        return np.array(self.get_central_state()), reward, done
+        # Return local states, gloabl state, rewards, done
+        return self.get_local_state(), self.get_central_state(), rewards, done
 
-    def is_valid_move(self, new_pos, sensor_reading, action):
+    def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
-        # Check wthether the move is within the grid
+        # Use grid_width and grid_height
         if not (0 <= x < self.grid_width and 0 <= y < self.grid_height):
+            print(1)
             return False
-
-        # Check for obstacles
-        if self.grid[y, x] == 1:
+        if self.grid[y, x] == 1:  # Check for obstacles
+            print(2)
             return False
-
-        # # Check for other agents
-        # if new_pos in self.agent_positions or new_pos in other_new_positions:
-        #     return False
-
+        if new_pos in self.agent_positions or new_pos in other_new_positions:  # Check for other agents
+            print(3)
+            return False
         # Check sensor readings for specific direction
         if action == 0 and sensor_reading[0] == 1:  # forward
+            print(4)
             return False
         elif action == 1 and sensor_reading[1] == 1:  # backward
+            print(5)
             return False
         elif action == 2 and sensor_reading[2] == 1:  # left
+            print(6)
             return False
         elif action == 3 and sensor_reading[3] == 1:  # right
+            print(7)
             return False
         return True
 
@@ -174,41 +208,56 @@ class MultiAgentGridEnv:
 
         state = np.concatenate([
             coverage_scores.flatten(),  # Coverage score for each PoI
-            coverage_state.flatten(),])
+            coverage_state.flatten()])
 
-        return state
+        return np.array(state)
 
-    def get_local_state(self, position):
-        x, y = position
-
+    def get_local_state(self):
         coverage_scores = self.poi_coverage_counter / self.max_step
-        coverage_state = (self.coverage_grid > 0).astype(int)
+        coverage_states = (self.coverage_grid > 0).astype(int)
 
-        local_coverage_score = []
-        local_coverage_state = []
-        for dx in range(-self.coverage_radius, self.coverage_radius + 1):
-            for dy in range(-self.coverage_radius, self.coverage_radius + 1):
-                nx, ny = x + dx, y + dy
-                local_coverage_score.append(coverage_scores[ny, nx])
-                local_coverage_state.append(coverage_state[ny, nx])
+        local_states = []
+        for pos in self.agent_positions:
+            x, y = pos
+
+            local_coverage_score = []
+            local_coverage_state = []
+            for dx in range(-self.coverage_radius, self.coverage_radius + 1):
+                for dy in range(-self.coverage_radius, self.coverage_radius + 1):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height:
+                        local_coverage_score.append(
+                            coverage_scores[ny, nx].item())
+                        local_coverage_state.append(
+                            coverage_states[ny, nx].item())
+                    else:
+                        local_coverage_score.append(-1.0)
+                        local_coverage_state.append(-1)
+            state = np.array(local_coverage_score + local_coverage_state)
+            local_states.append(state)
+
+        return local_states
 
     def get_sensor_readings(self):
-        x, y = self.agent_positions
-        reading = [
-            1 if x == self.grid_width -
-            # forward
-            1 or self.grid[y, x + 1] == 1 or (x + 1, y) in self.agent_positions else 0,
-            # backward
-            1 if x == 0 or self.grid[y, x - 1] == 1 or (
-                x - 1, y) in self.agent_positions else 0,
-            1 if y == self.grid_height -
-            # left
-            1 or self.grid[y + 1, x] == 1 or (x, y + 1) in self.agent_positions else 0,
-            # right
-            1 if y == 0 or self.grid[y - 1, x] == 1 or (
-                x, y - 1) in self.agent_positions else 0
-        ]
-        return reading
+        readings = []
+        for pos in self.agent_positions:
+            x, y = pos
+            reading = [
+                1 if x == self.grid_width -
+                # forward
+                1 or self.grid[y, x + 1] == 1 or (x + 1, y) in self.agent_positions else 0,
+                # backward
+                1 if x == 0 or self.grid[y, x - 1] == 1 or (
+                    x - 1, y) in self.agent_positions else 0,
+                1 if y == self.grid_height -
+                # left
+                1 or self.grid[y + 1, x] == 1 or (x, y + 1) in self.agent_positions else 0,
+                # right
+                1 if y == 0 or self.grid[y - 1, x] == 1 or (
+                    x, y - 1) in self.agent_positions else 0
+            ]
+            readings.append(reading)
+        return readings
 
     def get_obs_size(self):
         return self.central_state_size
