@@ -21,34 +21,49 @@ actor_output_size = env.get_total_actions()
 ia2cc = IA2CC(actor_input_size=actor_input_size,
               actor_output_size=actor_output_size, critic_input_size=critic_input_size, num_agents=env.num_agents)
 
+
 episode_reward = 0
 episodes_reward = []
 joint_observations = env.reset()
 episode = 0
-while episode < max_episode:
-    actions = ia2cc.act(joint_observations)
-    next_joint_observation, reward, done, _ = env.step(actions)
 
-    # agents.memory.reward.append(reward)
-    # for i in range(agent_num):
-    #     agents.memory.done[i].append(done_n[i])
+# Hyperparameter
+gamma = 1
+step = 0
+update_interval = 30
+# Buffers for 30-step rollout
+obs_buffer = []
+next_obs_buffer = []
+log_probs_buffer = []
+entropies_buffer = []
+rewards_buffer = []
+
+while episode < max_episode:
+
+    actions, log_probs, entropies = ia2cc.act(joint_observations)
+    next_joint_observations, reward, done, _ = env.step(actions)
 
     episode_reward += reward
 
-    joint_observations = next_joint_observation
+    # ia2cc.compute_loss(
+    #     reward, joint_observations, next_joint_observations, log_probs, entropies
+    # )
+
+    # Store in buffer
+    obs_buffer.append(joint_observations)
+    next_obs_buffer.append(next_joint_observations)
+    log_probs_buffer.append(log_probs)
+    entropies_buffer.append(entropies)
+    rewards_buffer.append(reward)
+
+    joint_observations = next_joint_observations
+    step += 1
 
     if done:
-        episodes_reward.append(episode_reward)
-        episode_reward = 0
-
-        episode += 1
-
-        obs = env.reset()
-
         if episode % 10 == 0:
-            # Update
-            pass
-
-        if episode % 100 == 0:
-            print(
-                f"episode: {episode}, average reward: {sum(episodes_reward[-100:]) / 100}")
+            print(f"Episode {episode} ended with reward {episode_reward}")
+            print(env.agent_positions)
+        episode += 1
+        joint_observations = env.reset()
+        episode_reward = 0
+        i = 0
