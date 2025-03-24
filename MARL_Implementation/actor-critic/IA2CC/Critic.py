@@ -8,9 +8,9 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         self.network = nn.Sequential(
             nn.Linear(input_size, 128),
-            nn.LeakyReLU(),
+            nn.Tanh(),
             nn.Linear(128, 128),
-            nn.LeakyReLU(),
+            nn.Tanh(),
             nn.Linear(128, 1)
         )
 

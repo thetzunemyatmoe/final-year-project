@@ -71,3 +71,33 @@ class IA2CC:
             self.actor_optimizers[i].step()
 
         return critic_loss
+
+    def compute_episode_loss(self, rewards, obs, next_obs, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+        T = len(rewards)
+
+        # Step 1: Compute all state values
+        values = [self.get_value(o) for o in obs]
+        values.append(last_value.detach())
+
+        # Step 2: Compute advantages using TD(0)
+        advantages = []
+        for t in range(T):
+            delta = rewards[t] + gamma * values[t+1] - values[t]
+            advantages.append(delta)
+
+        # Step 3: Critic loss
+        critic_loss = sum([adv.pow(2) for adv in advantages]) / T
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward(retain_graph=True)
+        self.critic_optimizer.step()
+
+        # Step 4: Actor loss for each agent
+        for i in range(self.num_agents):
+            actor_loss = 0
+            for t in range(T):
+                advantage = advantages[t].detach()
+                actor_loss += -log_probs[t][i] * advantage
+            actor_loss /= T
+            self.actor_optimizers[i].zero_grad()
+            actor_loss.backward()
+            self.actor_optimizers[i].step()
