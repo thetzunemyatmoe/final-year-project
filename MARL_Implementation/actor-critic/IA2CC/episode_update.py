@@ -1,6 +1,7 @@
 
 from environment import MultiAgentGridEnv
 from IA2CC import IA2CC
+import numpy as np
 
 
 max_episode = 1000
@@ -59,18 +60,20 @@ while episode < max_episode:
             print(f"Episode {episode} return: {episode_reward:.2f}")
             print(env.agent_positions)
 
+        # Normalize rewards_buffer
+        mean_r = np.mean(rewards_buffer)
+        std_r = np.std(rewards_buffer) + 1e-8
+        normalized_rewards = [(r - mean_r) / std_r for r in rewards_buffer]
+
         # Compute value of final state (for bootstrap)
         last_value = ia2cc.get_value(joint_observations).detach()
 
         # Call the new episodic loss function
         ia2cc.compute_episode_loss(
-            rewards_buffer,
+            normalized_rewards,
             obs_buffer,
-            next_obs_buffer,
             log_probs_buffer,
-            entropies_buffer,
             last_value,
-            gamma=0.99
         )
 
         # New episode
@@ -83,3 +86,5 @@ while episode < max_episode:
         log_probs_buffer.clear()
         entropies_buffer.clear()
         rewards_buffer.clear()
+
+env.render()

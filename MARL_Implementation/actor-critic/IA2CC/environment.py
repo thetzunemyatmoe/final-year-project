@@ -69,7 +69,7 @@ class MultiAgentGridEnv:
         # Update coverage state and coverage score
 
         self.update_coverage()
-        global_reward = self.calculate_global_reward()
+        global_reward = self.calculate_global_reward(actual_actions)
         done = self.current_step >= self.max_steps_per_episode
         return self.get_observations(), global_reward, done, actual_actions
 
@@ -123,7 +123,7 @@ class MultiAgentGridEnv:
     # Reward Calculation
     # ***********
 
-    def calculate_global_reward(self):
+    def calculate_global_reward(self, actual_actions):
         self.total_area = np.sum(self.coverage_grid > 0)
         self.overlap_penalty = self.calculate_overlap()
 
@@ -142,15 +142,27 @@ class MultiAgentGridEnv:
         self.sensor_penalty = self.sensor_1s * \
             ((1 + 2*self.coverage_radius)**2)
 
+        self.energy_penalty = self.energy_consumption(actual_actions)
+
         reward = (
             self.total_area
             - (1) * self.overlap_penalty
-            - self.connectivity_penalty
-            - self.hole_penalty
             - self.sensor_penalty  # Adjust the weight as needed
+            - self.energy_penalty
         )
 
         return reward
+
+    def energy_consumption(self, actual_actions):
+
+        energy_penalty = 0
+        for action in actual_actions:
+            if action == 4:
+                energy_penalty += 1
+            else:
+                energy_penalty += 3
+
+        return energy_penalty
 
     def calculate_sensor_penalty(self):
         sensor_readings = self.get_sensor_readings()

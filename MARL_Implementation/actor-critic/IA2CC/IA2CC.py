@@ -4,7 +4,6 @@ import torch.nn.functional as F
 
 from Actor import Actor
 from Critic import Critic
-from Memory import Memory
 
 
 class IA2CC:
@@ -27,10 +26,6 @@ class IA2CC:
             actor.parameters(), lr=actor_learning_rate) for actor in self.actors]
         self.critic_optimizer = optim.Adam(
             self.central_critic.parameters(), lr=critc_leanring_rate)
-
-        # Memory
-        self.memory = Memory(agent_num=num_agents,
-                             action_dim=actor_output_size)
 
     def act(self, joint_observation):
         actions = []
@@ -72,26 +67,26 @@ class IA2CC:
 
         return critic_loss
 
-    def compute_episode_loss(self, rewards, obs, next_obs, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+    def compute_episode_loss(self, rewards, obs, log_probs, last_value, gamma=0.99):
         T = len(rewards)
 
-        # Step 1: Compute all state values
+        # All state values
         values = [self.get_value(o) for o in obs]
         values.append(last_value.detach())
 
-        # Step 2: Compute advantages using TD(0)
+        # Advantages
         advantages = []
         for t in range(T):
             delta = rewards[t] + gamma * values[t+1] - values[t]
             advantages.append(delta)
 
-        # Step 3: Critic loss
+        # Critic loss
         critic_loss = sum([adv.pow(2) for adv in advantages]) / T
         self.critic_optimizer.zero_grad()
         critic_loss.backward(retain_graph=True)
         self.critic_optimizer.step()
 
-        # Step 4: Actor loss for each agent
+        # Actor loss for each agent
         for i in range(self.num_agents):
             actor_loss = 0
             for t in range(T):
