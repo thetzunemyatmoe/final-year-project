@@ -1,5 +1,5 @@
 
-from environment import MultiAgentGridEnv
+from example_env import MultiAgentGridEnv
 from IA2CC import IA2CC
 import numpy as np
 from collections import deque
@@ -32,10 +32,7 @@ def train(max_episode=3000):
 
     env = MultiAgentGridEnv(
         grid_file='grid_world.json',
-        coverage_radius=4,
-        max_steps_per_episode=50,
-        num_agents=4,
-        initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
+        coverage_radius=2
     )
 
     # NN pararmeters

@@ -1,13 +1,16 @@
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 from Actor import Actor
 from Critic import Critic
 
 
 class IA2CC:
-    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.001, critc_leanring_rate=0.005):
+    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.0001, critc_leanring_rate=0.005):
         # NN pararmeters
         self.actor_input_size = actor_input_size
         self.actor_output_size = actor_output_size
@@ -67,7 +70,7 @@ class IA2CC:
 
         return critic_loss
 
-    def compute_episode_loss(self, rewards, obs, log_probs, last_value, gamma=0.99):
+    def compute_episode_loss(self, rewards, obs, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
         T = len(rewards)
 
         # All state values
@@ -86,13 +89,24 @@ class IA2CC:
         critic_loss.backward(retain_graph=True)
         self.critic_optimizer.step()
 
-        # Actor loss for each agent
         for i in range(self.num_agents):
             actor_loss = 0
             for t in range(T):
                 advantage = advantages[t].detach()
-                actor_loss += -log_probs[t][i] * advantage
+                entropy = entropies[t][i]  # entropy for agent i at timestep t
+                actor_loss += -log_probs[t][i] * \
+                    advantage - entropy_weight * entropy
             actor_loss /= T
             self.actor_optimizers[i].zero_grad()
             actor_loss.backward()
             self.actor_optimizers[i].step()
+
+    def moving_average(self, x, count):
+        return np.convolve(x, np.ones((count,)) / count, mode='valid')
+
+    def display_moving_average(self, episodes_reward):
+        plt.plot(self.moving_average(episodes_reward, 100))
+        plt.title('Learning curve')
+        plt.xlabel("Episodes")
+        plt.ylabel("Reward")
+        plt.show()
