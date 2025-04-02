@@ -2,108 +2,81 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import random
+import networkx as nx
 
 
 class MultiAgentGridEnv:
-
-    def __init__(self, grid_file, coverage_radius, initial_positions=None):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, initial_positions, reward_type='global'):
         self.grid = self.load_grid(grid_file)
-        self.max_fi = 0
+        # Use height and width instead of grid_size
         self.grid_height, self.grid_width = self.grid.shape
-
-        # Initialize instance variable
         self.coverage_radius = coverage_radius
-
-        self.total_cells = self.grid_height * self.grid_width
+        self.max_steps_per_episode = max_steps_per_episode
+        self.num_agents = num_agents
+        self.initial_positions = initial_positions
+        self.reward_type = reward_type
 
         # Calculate new obs_size for local rich observations
-        self.obs_size = 2*self.total_cells
+        # self.obs_size = (
+        #     2 +  # Agent's own position (x, y)  ###
+        #     4 +  # Sensor readings
+        #     1 +  # Current time step
+        #     # Local view of coverage grid and the map
+        #     (2*coverage_radius + 1)**2 * 2 +
+        #     (num_agents - 1) * 2  # Relative positions of other agents (x, y)
+        # )
+        self.obs_size = 2 * (self.coverage_radius*2 + 1)**2
 
-        self.num_agents = 2
-
-        if initial_positions is None:
-            self.initial_positions = []
-            for _ in range(self.num_agents):
-                x = random.randint(0, self.grid_height-1)
-                y = random.randint(0, self.grid_width-1)
-                self.initial_positions.append((x, y))
-        else:
-            self.initial_positions = initial_positions
-
-        self.max_step = 100
+        self.nx = nx
+        self.reset()
 
     def load_grid(self, filename):
         with open(filename, 'r') as f:
             return np.array(json.load(f))
 
     def reset(self):
-
-        # Sets the agents' positions to their initial positions.
-        self.agent_positions = self.initial_positions
-
-        # Reset current step count to zer
-        self.current_step = 0
-
-        # Track coverage for each PoI
-        self.poi_coverage_counter = np.zeros_like(self.grid)
-        self.update_coverage()
-
-        total_coverage = np.sum(self.poi_coverage_counter)
-        squared_coverage_score = np.sum(self.poi_coverage_counter ** 2)
-        num_pois = np.count_nonzero(self.grid == 0)
-
-        coverage_score = self.poi_coverage_counter / self.max_step
-
-        return np.array(self.get_observations())
-
-    # ***********
-    # Update MDP after each step
-    # ***********
-
-    def update_coverage(self):
+        self.agent_positions = list(self.initial_positions)
         self.coverage_grid = np.zeros_like(self.grid)
-        self.cover_area(self.agent_positions)
-
-    def cover_area(self, positions):
-        for position in positions:
-            x, y = position
-
-            for dx in range(-self.coverage_radius, self.coverage_radius + 1):
-                for dy in range(-self.coverage_radius, self.coverage_radius + 1):
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
-                        self.coverage_grid[ny, nx] = 1
-                        self.poi_coverage_counter[ny, nx] += 1
+        self.poi_coverage_counter = np.zeros_like(self.grid)
+        self.current_step = 0
+        self.update_coverage()
+        return self.get_observations()
 
     def step(self, actions):
+        # Increment the counter
         self.current_step += 1
 
+        #
         new_positions = []
         actual_actions = []
+
+        # Sensor reading for each UAV
         sensor_readings = self.get_sensor_readings()
 
-        # First, calculate all new positions
+        # Calculate all new positions
         for i, action in enumerate(actions):
             new_pos = self.get_new_position(self.agent_positions[i], action)
             new_positions.append(new_pos)
             actual_actions.append(action)
 
-        # Then, validate moves and update positions
+        # Validate moves
         for i, new_pos in enumerate(new_positions):
             if not self.is_valid_move(new_pos, sensor_readings[i], actual_actions[i], new_positions[:i] + new_positions[i+1:]):
                 new_positions[i] = self.agent_positions[i]
                 actual_actions[i] = 4  # Stay action
 
+        # Set new positions
         self.agent_positions = new_positions
 
         # Coverage score on step t-1
-        previous_coverage_score = self.poi_coverage_counter / self.max_step
+        previous_coverage_score = self.poi_coverage_counter / self.max_steps_per_episode
+
+        # Update coverage state and coverage score
 
         self.update_coverage()
 
         # Coverage score of each PoI
-        coverage_score = self.poi_coverage_counter / self.max_step
+        coverage_score = self.poi_coverage_counter / self.max_steps_per_episode
 
         # Fairness Index
         total_coverage_score = np.sum(coverage_score)
@@ -112,28 +85,18 @@ class MultiAgentGridEnv:
         fairness_index = (total_coverage_score ** 2) / \
             (num_pois * squared_coverage_score)
 
-        sensonr_penalties = self.calculate_sensor_penalty()
-
-        self.max_fi = max(self.max_fi, fairness_index)
-
         # Incremental Coverage (Δc_k)
         delta_coverage = np.sum(coverage_score - previous_coverage_score)
 
-        # Energy Consumption (Δe_i) Placeholder
-        delta_energy = 1  # TODO implement the incremental energy consumption
+        # Overlap penalty
+        self.overlap_penalty = self.calculate_overlap()
 
-        reward = fairness_index * delta_coverage
+        global_reward = (fairness_index * delta_coverage) - \
+            (0.001 * self.overlap_penalty)
 
-        total_penalties = []
-        print(f'Group reward is {reward}')
-        for sensor_penalty in sensonr_penalties:
-            total_penalties.append((reward / self.num_agents) + sensor_penalty)
+        done = self.current_step >= self.max_steps_per_episode
 
-        print(f'Total penalties is {total_penalties}')
-
-        done = self.current_step >= self.max_step
-
-        return np.array(self.get_observations()), reward, done
+        return self.get_observations(), global_reward, done, actual_actions
 
     def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
@@ -155,21 +118,10 @@ class MultiAgentGridEnv:
             return False
         return True
 
-    # Calculate sensor penalty for specific UAV
-
-    def calculate_sensor_penalty(self):
-        readings = self.get_sensor_readings()
-        penalties = []
-
-        for reading in readings:
-            penalty = 1 if sum(reading) > 0 else 0
-            penalties.append(penalty)
-
-        return penalties
-
-    # ***********
-    # Getter Functions
-    # ***********
+    def update_coverage(self):
+        self.coverage_grid = np.zeros_like(self.grid)
+        for pos in self.agent_positions:
+            self.cover_area(pos)
 
     def get_new_position(self, position, action):
         x, y = position
@@ -184,24 +136,183 @@ class MultiAgentGridEnv:
         else:  # stay
             return (x, y)
 
+    def cover_area(self, state):
+        x, y = state
+        for dx in range(-self.coverage_radius, self.coverage_radius + 1):
+            for dy in range(-self.coverage_radius, self.coverage_radius + 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
+                    self.coverage_grid[ny, nx] = 1
+                    self.poi_coverage_counter[ny, nx] += 1
+
+    # ***********
+    # Reward Calculation
+    # ***********
+
+    def calculate_global_reward(self, actual_actions):
+        self.total_area = np.sum(self.coverage_grid > 0)
+        self.overlap_penalty = self.calculate_overlap()
+
+        graph = self.build_graph()
+        self.num_components = nx.number_connected_components(graph)
+
+        if self.num_components == 1:
+            self.connectivity_penalty = 0
+        else:
+            self.connectivity_penalty = (
+                self.num_agents) * (self.num_components - 1) * ((1 + 2*self.coverage_radius)**2)
+
+        self.hole_penalty = self.calculate_hole_penalty(graph)
+
+        self.sensor_1s = self.calculate_sensor_penalty()
+        self.sensor_penalty = self.sensor_1s * \
+            ((1 + 2*self.coverage_radius)**2)
+
+        self.energy_penalty = self.energy_consumption(actual_actions)
+
+        reward = (
+            self.total_area
+            - (1) * self.overlap_penalty
+            - self.sensor_penalty  # Adjust the weight as needed
+            - self.energy_penalty
+        )
+
+        return reward
+
+    def energy_consumption(self, actual_actions):
+
+        energy_penalty = 0
+        for action in actual_actions:
+            if action == 4:
+                energy_penalty += 1
+            else:
+                energy_penalty += 3
+
+        return energy_penalty
+
+    def calculate_sensor_penalty(self):
+        sensor_readings = self.get_sensor_readings()
+        total_penalty = 0
+        for readings in sensor_readings:
+            # Sum up the number of 'blocked' directions (1's in the sensor reading)
+            penalty = sum(readings)
+            if penalty > 0:
+                total_penalty += 1
+
+        return total_penalty
+
+    # Hole penalty Implementation, using chordless cycles
+
+    def calculate_hole_penalty(self, graph):
+        chordless_cycles = self.find_chordless_cycles(graph)
+        num_holes = len(chordless_cycles)
+        return num_holes * (self.num_agents * (1 + 2*self.coverage_radius)**2)
+
+    def find_chordless_cycles(self, graph):
+        chordless_cycles = []
+        visited_cycles = set()
+        for node in graph.nodes():
+            self._find_cycles_from_node(graph, node, [node], set(
+                [node]), chordless_cycles, visited_cycles)
+        return chordless_cycles
+
+    def _find_cycles_from_node(self, graph, start, path, visited, chordless_cycles, visited_cycles):
+        neighbors = set(graph.neighbors(path[-1])) - set(path[1:])
+        for neighbor in neighbors:
+            if neighbor == start and len(path) > 3:
+                cycle = path[:]
+                if self._is_chordless(graph, cycle):
+                    cycle_key = tuple(sorted(cycle))
+                    if cycle_key not in visited_cycles:
+                        chordless_cycles.append(cycle)
+                        visited_cycles.add(cycle_key)
+            elif neighbor not in visited:
+                self._find_cycles_from_node(
+                    graph, start, path + [neighbor], visited | {neighbor}, chordless_cycles, visited_cycles)
+
+    def _is_chordless(self, graph, cycle):
+        for i in range(len(cycle)):
+            for j in range(i+2, len(cycle)):
+                if (i != 0 or j != len(cycle)-1) and graph.has_edge(cycle[i], cycle[j]):
+                    return False
+        return True
+
+    def build_graph(self):
+        G = nx.Graph()
+        G.add_nodes_from(range(self.num_agents))
+        for i, pos1 in enumerate(self.agent_positions):
+            for j, pos2 in enumerate(self.agent_positions[i+1:], i+1):
+                if self.areas_overlap(pos1, pos2):
+                    G.add_edge(i, j)
+        return G
+
+    def areas_overlap(self, pos1, pos2):
+        x1, y1 = pos1
+        x2, y2 = pos2
+        return abs(x1 - x2) <= 2 * self.coverage_radius and abs(y1 - y2) <= 2 * self.coverage_radius
+
+    # End of hole penalty implementation
+
+    def calculate_overlap(self):
+        overlap_grid = np.zeros_like(self.coverage_grid)
+        for pos in self.agent_positions:
+            temp_grid = np.zeros_like(self.coverage_grid)
+            self.cover_area_on_grid(pos, temp_grid)
+            overlap_grid += temp_grid
+
+        overlap_counts = overlap_grid[overlap_grid > 1] - 1
+        weighted_overlap = np.sum(overlap_counts)
+        return weighted_overlap
+
+    def cover_area_on_grid(self, state, grid):
+        x, y = state
+        for dx in range(-self.coverage_radius, self.coverage_radius + 1):
+            for dy in range(-self.coverage_radius, self.coverage_radius + 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
+                    grid[ny, nx] += 1  # Increment instead of setting to 1
+
+    # ***********
+    # Reward Calculation end
+    # ***********
+
     def get_observations(self):
-        # Normalize the coverage score between 0 and 1
-        coverage_scores = self.poi_coverage_counter / self.max_step
+        coverage_scores = self.poi_coverage_counter / self.max_steps_per_episode
+        coverage_states = (self.coverage_grid > 0).astype(int)
 
-        # Binary coverage state (1 if covered in current step, 0 otherwise)
-        coverage_state = (self.coverage_grid > 0).astype(int)
+        local_states = []
 
-        state = np.concatenate([
-            coverage_scores.flatten(),  # Coverage score for each PoI
-            coverage_state.flatten(),])
+        for pos in self.agent_positions:
+            x, y = pos
 
-        return state
+            local_coverage_score = []
+            local_coverage_state = []
+            for dx in range(-self.coverage_radius, self.coverage_radius + 1):
+                for dy in range(-self.coverage_radius, self.coverage_radius + 1):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height:
+                        local_coverage_score.append(
+                            coverage_scores[ny, nx].item())
+                        local_coverage_state.append(
+                            coverage_states[ny, nx].item())
+                    else:
+                        local_coverage_score.append(-1.0)
+                        local_coverage_state.append(-1)
+            state = np.array(local_coverage_score + local_coverage_state)
+            local_states.append(state)
+
+        return local_states
+
+    def get_obs_size(self):
+        return self.obs_size
+
+    def get_total_actions(self):
+        return 5  # forward, backward, left, right, stay
 
     def get_sensor_readings(self):
         readings = []
-        for position in self.agent_positions:
-
-            x, y = position
+        for pos in self.agent_positions:
+            x, y = pos
             reading = [
                 1 if x == self.grid_width -
                 # forward
@@ -219,14 +330,18 @@ class MultiAgentGridEnv:
             readings.append(reading)
         return readings
 
-    def get_obs_size(self):
-        return self.obs_size
+    # Can be useful for debugging
 
-    def get_total_actions(self):
-        return 5  # forward, backward, left, right, stay
-
-    def get_num_agents(self):
-        return self.num_agents
+    def get_metrics(self):
+        return {
+            "Total Area": self.total_area,
+            "Overlap Penalty": self.overlap_penalty,
+            "Connectivity Penalty": self.connectivity_penalty,
+            "Hole Penalty": self.hole_penalty,
+            "Number of Components": self.num_components,
+            "Number of Holes": len(self.find_chordless_cycles(self.build_graph())),
+            "Reward": self.total_area - self.overlap_penalty - self.connectivity_penalty - self.hole_penalty
+        }
 
     def render(self, ax=None, actions=None, step=None, return_rgb=False):
         if ax is None:

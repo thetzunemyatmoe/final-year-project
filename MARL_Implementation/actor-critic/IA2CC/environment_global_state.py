@@ -36,7 +36,7 @@ class MultiAgentGridEnv:
         # NetworkX variable
         self.nx = nx
         # Reset the environment to initial state
-        self.reset()
+        # self.reset()
 
     def load_grid(self, filename):
         """
@@ -65,7 +65,10 @@ class MultiAgentGridEnv:
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
 
-        return self.get_observations()
+        # print(self.coverage_grid)
+        # print(self.grid)
+
+        return self.get_observations(), self.get_state()
 
     def update_coverage(self):
         # Resets the coverage grid to zero (No ares have been covered)
@@ -95,7 +98,7 @@ class MultiAgentGridEnv:
         self.update_coverage()
         global_reward = self.calculate_global_reward()
         done = self.current_step >= self.max_steps_per_episode
-        return self.get_observations(), global_reward, done, actual_actions
+        return self.get_observations(), global_reward, done, actual_actions, self.get_state()
 
     def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
@@ -295,6 +298,37 @@ class MultiAgentGridEnv:
             observations.append(np.array(obs, dtype=np.float32))
 
         return observations
+
+    def get_state(self):
+
+        state = []
+
+        # Position of each agent
+        for pos in self.agent_positions:
+            state.append(pos[0])
+            state.append(pos[1])
+
+        print(self.coverage_grid)
+        coverage_map = np.where(self.grid == 1, -1, 0)
+        coverage_map = np.where(self.coverage_grid == 1, 1, coverage_map)
+
+        # Coveage map (0- Uncovered, 1- Covered, -1 Obstacles)
+        state.extend(coverage_map.flatten().tolist())
+
+        # Relative position
+        for i in range(len(self.agent_positions)):
+            xi, yi = self.agent_positions[i]
+            for j in range(len(self.agent_positions)):
+                if i != j:
+                    xj, yj = self.agent_positions[j]
+                    dx = xj - xi
+                    dy = yj - yi
+                    state.append(dx)
+                    state.append(dy)
+
+        state.append(self.current_step)
+
+        return state
 
     def get_obs_size(self):
         return self.obs_size

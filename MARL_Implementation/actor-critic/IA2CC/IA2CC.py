@@ -75,6 +75,7 @@ class IA2CC:
 
         # All state values
         values = [self.get_value(o) for o in obs]
+        last_value = torch.tensor(last_value)
         values.append(last_value.detach())
 
         # Advantages

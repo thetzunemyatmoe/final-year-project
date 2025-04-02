@@ -9,9 +9,9 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.network = nn.Sequential(
             nn.Linear(input_size, 128),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(128, 128),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(128, output_size)
         )
 

@@ -28,11 +28,18 @@ def evaluate(ia2cc, env, episodes=20):
         f"\n✅ Avg evaluation reward over {episodes} episodes: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
 
 
+def get_new_rollout():
+    return [], [], [], [], []
+
+
 def train(max_episode=3000):
 
     env = MultiAgentGridEnv(
         grid_file='grid_world.json',
-        coverage_radius=2
+        coverage_radius=4,
+        max_steps_per_episode=50,
+        num_agents=4,
+        initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
     )
 
     # NN pararmeters
@@ -54,12 +61,8 @@ def train(max_episode=3000):
         done = False
         episode_actions = []
 
-        # Buffers
-        obs_buffer = []
-        next_obs_buffer = []
-        log_probs_buffer = []
-        entropies_buffer = []
-        rewards_buffer = []
+        # Rollout
+        obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
         while not done:
 
@@ -85,7 +88,7 @@ def train(max_episode=3000):
 
         if episode % 100 == 0:
             print(f"Episode {episode} return: {total_reward:.2f}")
-            print(env.agent_positions)
+            print(env.poi_coverage_counter)
 
         if total_reward > best_episode_reward:
             best_episode_reward = total_reward
@@ -98,7 +101,7 @@ def train(max_episode=3000):
         normalized_rewards = [(r - mean_r) / std_r for r in rewards_buffer]
 
         # Compute value of final state (for bootstrap)
-        last_value = ia2cc.get_value(joint_observations).detach()
+        last_value = 0
 
         ia2cc.compute_episode_loss(
             normalized_rewards,
@@ -108,12 +111,8 @@ def train(max_episode=3000):
             last_value,
         )
 
-        # Clear buffers
-        obs_buffer.clear()
-        next_obs_buffer.clear()
-        log_probs_buffer.clear()
-        entropies_buffer.clear()
-        rewards_buffer.clear()
+        # New Rollout
+        obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
     ia2cc.display_moving_average(episodes_reward)
     save_best_episode(env.initial_positions, best_episode_actions,
