@@ -41,10 +41,10 @@ class IA2CC:
             entropies.append(entropy)
         return actions, log_probs, entropies
 
-    def get_value(self, joint_observation):
-        return self.central_critic.forward(joint_observation=joint_observation)
+    def get_value(self, state):
+        return self.central_critic.forward(state)
 
-    def compute_loss(self, reward, joint_observations, next_joint_observations, log_probs, entropies, entropy_weight=0.1):
+    # def compute_loss(self, reward, joint_observations, next_joint_observations, log_probs, entropies, entropy_weight=0.1):
         # --- Critic update ---
         current_value = self.get_value(joint_observation=joint_observations)
         next_value = self.get_value(joint_observation=next_joint_observations)
@@ -70,11 +70,11 @@ class IA2CC:
 
         return critic_loss
 
-    def compute_episode_loss(self, rewards, obs, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
         T = len(rewards)
 
         # All state values
-        values = [self.get_value(o) for o in obs]
+        values = [self.get_value(state) for state in states]
         last_value = torch.tensor(last_value)
         values.append(last_value.detach())
 

@@ -12,5 +12,6 @@ env = MultiAgentGridEnv(
 
 local_obs, state = env.reset()
 
+print(state)
 
 local_obs, reward, done, actual_actions, state = env.step([2, 2, 2, 2])

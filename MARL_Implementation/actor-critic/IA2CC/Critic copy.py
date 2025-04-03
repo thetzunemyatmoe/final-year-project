@@ -14,12 +14,13 @@ class Critic(nn.Module):
             nn.Linear(128, 1)
         )
 
-    def forward(self, state):
-        x = self.build_state(state)
+    def forward(self, joint_observation):
+        x = self.build_state(joint_observation)
 
         return self.network(x)
 
-    def build_state(self, state):
-        state_tensor = torch.tensor(state, dtype=torch.float32)
-
+    def build_state(self, joint_observation):
+        obs_tensors = [torch.tensor(obs, dtype=torch.float32)
+                       for obs in joint_observation]
+        state_tensor = torch.cat(obs_tensors, dim=0)
         return state_tensor.unsqueeze(0)

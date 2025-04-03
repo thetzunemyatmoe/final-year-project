@@ -33,6 +33,10 @@ class MultiAgentGridEnv:
             (num_agents - 1) * 2  # Relative positions of other agents (x, y)
         )
 
+        # Calcualte size of the state
+        self.state_size = (2 * self.num_agents + (self.grid_height *
+                           self.grid_width) + 2*(self.num_agents * (self.num_agents - 1)) + 1)
+
         # NetworkX variable
         self.nx = nx
         # Reset the environment to initial state
@@ -166,9 +170,8 @@ class MultiAgentGridEnv:
 
         reward = (
             self.total_area
-            - (0.75) * self.overlap_penalty
-            - self.connectivity_penalty
-            - self.hole_penalty
+            - self.overlap_penalty
+            - (0.75) * self.connectivity_penalty
             - self.sensor_penalty  # Adjust the weight as needed
         )
         return reward
@@ -308,7 +311,6 @@ class MultiAgentGridEnv:
             state.append(pos[0])
             state.append(pos[1])
 
-        print(self.coverage_grid)
         coverage_map = np.where(self.grid == 1, -1, 0)
         coverage_map = np.where(self.coverage_grid == 1, 1, coverage_map)
 
@@ -332,6 +334,9 @@ class MultiAgentGridEnv:
 
     def get_obs_size(self):
         return self.obs_size
+
+    def get_state_size(self):
+        return self.state_size
 
     def get_total_actions(self):
         return 5  # forward, backward, left, right, stay
