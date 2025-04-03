@@ -80,7 +80,7 @@ class IA2CC:
         return np.convolve(x, np.ones((count,)) / count, mode='valid')
 
     def display_moving_average(self, episodes_reward):
-        plt.plot(self.moving_average(episodes_reward, 100))
+        plt.plot(self.moving_average(episodes_reward, 20))
         plt.title('Learning curve')
         plt.xlabel("Episodes")
         plt.ylabel("Reward")

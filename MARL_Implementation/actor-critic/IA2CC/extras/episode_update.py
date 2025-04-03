@@ -1,5 +1,5 @@
 
-from environment import MultiAgentGridEnv
+from extras.environment import MultiAgentGridEnv
 from IA2CC import IA2CC
 import numpy as np
 from collections import deque

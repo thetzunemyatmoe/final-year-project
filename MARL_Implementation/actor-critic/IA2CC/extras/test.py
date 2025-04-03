@@ -1,4 +1,4 @@
-from environment_global_state import MultiAgentGridEnv
+from environment import MultiAgentGridEnv
 
 
 env = MultiAgentGridEnv(
