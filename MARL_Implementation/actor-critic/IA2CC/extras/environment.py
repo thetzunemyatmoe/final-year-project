@@ -33,14 +33,10 @@ class MultiAgentGridEnv:
             (num_agents - 1) * 2  # Relative positions of other agents (x, y)
         )
 
-        # Calcualte size of the state
-        self.state_size = (2 * self.num_agents + (self.grid_height *
-                           self.grid_width) + 2*(self.num_agents * (self.num_agents - 1)) + 1)
-
         # NetworkX variable
         self.nx = nx
         # Reset the environment to initial state
-        # self.reset()
+        self.reset()
 
     def load_grid(self, filename):
         """
@@ -69,10 +65,7 @@ class MultiAgentGridEnv:
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
 
-        # print(self.coverage_grid)
-        # print(self.grid)
-
-        return self.get_observations(), self.get_state()
+        return self.get_observations()
 
     def update_coverage(self):
         # Resets the coverage grid to zero (No ares have been covered)
@@ -102,7 +95,7 @@ class MultiAgentGridEnv:
         self.update_coverage()
         global_reward = self.calculate_global_reward()
         done = self.current_step >= self.max_steps_per_episode
-        return self.get_observations(), global_reward, done, actual_actions, self.get_state()
+        return self.get_observations(), global_reward, done, actual_actions
 
     def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
@@ -170,8 +163,9 @@ class MultiAgentGridEnv:
 
         reward = (
             self.total_area
-            - self.overlap_penalty
-            - (0.75) * self.connectivity_penalty
+            - (0.75) * self.overlap_penalty
+            - self.connectivity_penalty
+            - self.hole_penalty
             - self.sensor_penalty  # Adjust the weight as needed
         )
         return reward
@@ -302,41 +296,8 @@ class MultiAgentGridEnv:
 
         return observations
 
-    def get_state(self):
-
-        state = []
-
-        # Position of each agent
-        for pos in self.agent_positions:
-            state.append(pos[0])
-            state.append(pos[1])
-
-        coverage_map = np.where(self.grid == 1, -1, 0)
-        coverage_map = np.where(self.coverage_grid == 1, 1, coverage_map)
-
-        # Coveage map (0- Uncovered, 1- Covered, -1 Obstacles)
-        state.extend(coverage_map.flatten().tolist())
-
-        # Relative position
-        for i in range(len(self.agent_positions)):
-            xi, yi = self.agent_positions[i]
-            for j in range(len(self.agent_positions)):
-                if i != j:
-                    xj, yj = self.agent_positions[j]
-                    dx = xj - xi
-                    dy = yj - yi
-                    state.append(dx)
-                    state.append(dy)
-
-        state.append(self.current_step)
-
-        return state
-
     def get_obs_size(self):
         return self.obs_size
-
-    def get_state_size(self):
-        return self.state_size
 
     def get_total_actions(self):
         return 5  # forward, backward, left, right, stay

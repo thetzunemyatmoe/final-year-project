@@ -1,6 +1,4 @@
-
-# from environment import MultiAgentGridEnv
-from environment_global_state import MultiAgentGridEnv
+from environment import MultiAgentGridEnv
 from IA2CC import IA2CC
 import numpy as np
 from collections import deque
@@ -16,13 +14,13 @@ import json
 def evaluate(ia2cc, env, episodes=20):
     rewards = []
     for _ in range(episodes):
-        obs = env.reset()
+        obs, _ = env.reset()
         done = False
         total_reward = 0
         while not done:
             # deterministic=True → greedy
-            actions, _, _ = ia2cc.act(obs, deterministic=True)
-            obs, r, done, _ = env.step(actions)
+            actions, _, _ = ia2cc.act(obs)
+            obs, r, done, _, _ = env.step(actions)
             total_reward += r
         rewards.append(total_reward)
     print(
@@ -33,7 +31,7 @@ def get_new_rollout():
     return [], [], [], [], []
 
 
-def train(max_episode=3000):
+def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_weight=0.05):
 
     env = MultiAgentGridEnv(
         grid_file='grid_world.json',
@@ -49,7 +47,14 @@ def train(max_episode=3000):
     actor_output_size = env.get_total_actions()
 
     ia2cc = IA2CC(actor_input_size=actor_input_size,
-                  actor_output_size=actor_output_size, critic_input_size=critic_input_size, num_agents=env.num_agents)
+                  actor_output_size=actor_output_size,
+                  critic_input_size=critic_input_size,
+                  num_agents=env.num_agents,
+                  #   actor_learning_rate=actor_lr,
+                  #   critic_leanring_rate=critic_lr,
+                  #   gamma=gamma,
+                  #   entropy_weight=entropy_weight
+                  )
 
     episodes_reward = []
     best_episode_reward = float('-inf')
@@ -115,6 +120,15 @@ def train(max_episode=3000):
         # New Rollout
         obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
+    env = MultiAgentGridEnv(
+        grid_file='grid_world.json',
+        coverage_radius=4,
+        max_steps_per_episode=50,
+        num_agents=4,
+        initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
+    )
+
+    evaluate(ia2cc=ia2cc, env=env)
     ia2cc.display_moving_average(episodes_reward)
     save_best_episode(env.initial_positions, best_episode_actions,
                       best_episode_number, best_episode_reward)

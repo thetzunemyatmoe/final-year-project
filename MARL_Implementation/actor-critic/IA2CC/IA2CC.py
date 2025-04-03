@@ -10,7 +10,7 @@ from Critic import Critic
 
 
 class IA2CC:
-    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.0001, critc_leanring_rate=0.005):
+    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.0001, critic_leanring_rate=0.005, gamma=0.99, entropy_weight=0.05):
         # NN pararmeters
         self.actor_input_size = actor_input_size
         self.actor_output_size = actor_output_size
@@ -28,7 +28,7 @@ class IA2CC:
         self.actor_optimizers = [optim.Adam(
             actor.parameters(), lr=actor_learning_rate) for actor in self.actors]
         self.critic_optimizer = optim.Adam(
-            self.central_critic.parameters(), lr=critc_leanring_rate)
+            self.central_critic.parameters(), lr=critic_leanring_rate)
 
     def act(self, joint_observation):
         actions = []
@@ -43,32 +43,6 @@ class IA2CC:
 
     def get_value(self, state):
         return self.central_critic.forward(state)
-
-    # def compute_loss(self, reward, joint_observations, next_joint_observations, log_probs, entropies, entropy_weight=0.1):
-        # --- Critic update ---
-        current_value = self.get_value(joint_observation=joint_observations)
-        next_value = self.get_value(joint_observation=next_joint_observations)
-
-        if not torch.is_tensor(reward):
-            reward = torch.tensor(
-                [[reward]], dtype=torch.float32, device=current_value.device)
-
-        td_error = reward + 0.99 * next_value - current_value
-        critic_loss = td_error.pow(2).mean()
-
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward(retain_graph=True)
-        self.critic_optimizer.step()
-
-        # --- Actor update with entropy regularization ---
-        for i in range(self.num_agents):
-            advantage = td_error.detach().view(-1)[0]  # Safe scalar
-            actor_loss = -log_probs[i] * advantage
-            self.actor_optimizers[i].zero_grad()
-            actor_loss.backward()
-            self.actor_optimizers[i].step()
-
-        return critic_loss
 
     def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
         T = len(rewards)
