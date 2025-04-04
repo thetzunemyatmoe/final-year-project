@@ -4,11 +4,13 @@ import json
 import matplotlib.pyplot as plt
 # Library for the creation, manipulation, and analysis of complex networks(graphs).
 import networkx as nx
+import random
 
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, initial_positions, reward_type='global'):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, reward_type='global', initial_positions=None):
+        print('New environment created')
 
         # Load the grid from the JSON file
         self.grid = self.load_grid(grid_file)
@@ -20,7 +22,11 @@ class MultiAgentGridEnv:
         self.coverage_radius = coverage_radius
         self.max_steps_per_episode = max_steps_per_episode
         self.num_agents = num_agents
-        self.initial_positions = initial_positions
+        if initial_positions is not None:
+            self.initial_positions = initial_positions
+        else:
+            self.initial_positions = self.initialize_position()
+
         self.reward_type = reward_type
 
         # Calculate new obs_size for local rich observations
@@ -39,21 +45,22 @@ class MultiAgentGridEnv:
 
         # NetworkX variable
         self.nx = nx
-        # Reset the environment to initial state
-        # self.reset()
 
     def load_grid(self, filename):
-        """
-        Loads a 2D grid from a JSON file and converts it to a NumPy array.
-
-        Args:
-            filename (str): The path to the JSON file containing the 2D grid data.
-
-        Returns:
-            numpy.ndarray: A NumPy array representing the loaded 2D grid.
-        """
         with open(filename, 'r') as f:
             return np.array(json.load(f))
+
+    def initialize_position(self):
+        initial_positions = []
+        x = random.randint(2, self.grid_height-3)
+        y = random.randint(2, self.grid_width-3)
+
+        initial_positions.append((x, y))
+        initial_positions.append((x+1, y))
+        initial_positions.append((x, y+1))
+        initial_positions.append((x+1, y+1))
+
+        return initial_positions
 
     def reset(self):
 
@@ -93,14 +100,17 @@ class MultiAgentGridEnv:
             actual_actions.append(action)
 
         # Then, validate moves and update positions
+        invalid_penalty = 0
         for i, new_pos in enumerate(new_positions):
             if not self.is_valid_move(new_pos, sensor_readings[i], actual_actions[i], new_positions[:i] + new_positions[i+1:]):
                 new_positions[i] = self.agent_positions[i]
                 actual_actions[i] = 4  # Stay action
+                invalid_penalty += 1
 
         self.agent_positions = new_positions
         self.update_coverage()
-        global_reward = self.calculate_global_reward()
+        global_reward = self.calculate_global_reward(
+            actions=actual_actions) - invalid_penalty
         done = self.current_step >= self.max_steps_per_episode
         return self.get_observations(), global_reward, done, actual_actions, self.get_state()
 
@@ -149,7 +159,7 @@ class MultiAgentGridEnv:
     # Reward Calculation
     # ***********
 
-    def calculate_global_reward(self):
+    def calculate_global_reward(self, actions):
         self.total_area = np.sum(self.coverage_grid > 0)
         self.overlap_penalty = self.calculate_overlap()
 
@@ -162,19 +172,30 @@ class MultiAgentGridEnv:
             self.connectivity_penalty = (
                 self.num_agents) * (self.num_components - 1) * ((1 + 2*self.coverage_radius)**2)
 
-        self.hole_penalty = self.calculate_hole_penalty(graph)
-
         self.sensor_1s = self.calculate_sensor_penalty()
         self.sensor_penalty = self.sensor_1s * \
             ((1 + 2*self.coverage_radius)**2)
 
+        self.energy_penalty = self.calculate_energy_penalty(actions)
+
         reward = (
             self.total_area
             - self.overlap_penalty
-            - (0.75) * self.connectivity_penalty
-            - self.sensor_penalty  # Adjust the weight as needed
+            - self.sensor_penalty
+            - self.energy_penalty
         )
         return reward
+
+    def calculate_energy_penalty(self, actions):
+
+        total_penalty = 0
+        for action in actions:
+            if action > 3:
+                total_penalty += 1
+            else:
+                total_penalty += 3
+
+        return total_penalty
 
     def calculate_sensor_penalty(self):
         sensor_readings = self.get_sensor_readings()

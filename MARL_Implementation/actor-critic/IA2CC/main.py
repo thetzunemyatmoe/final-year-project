@@ -10,10 +10,21 @@ from matplotlib.animation import FFMpegWriter
 import math
 import json
 
+grid_file = 'grid_world.json'
 
-def evaluate(ia2cc, env, episodes=20):
+
+def evaluate(ia2cc, episodes=20):
+    # Create 20 independent environments
+    envs = [MultiAgentGridEnv(
+        grid_file=grid_file,
+        coverage_radius=4,
+        max_steps_per_episode=50,
+        num_agents=4
+    ) for _ in range(episodes)]
+
     rewards = []
-    for _ in range(episodes):
+
+    for env in envs:
         obs, _ = env.reset()
         done = False
         total_reward = 0
@@ -23,8 +34,9 @@ def evaluate(ia2cc, env, episodes=20):
             obs, r, done, _, _ = env.step(actions)
             total_reward += r
         rewards.append(total_reward)
+
     print(
-        f"\n✅ Avg evaluation reward over {episodes} episodes: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
+        f"\n✅ Avg evaluation reward over {episodes} environments: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
 
 
 def get_new_rollout():
@@ -34,7 +46,7 @@ def get_new_rollout():
 def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_weight=0.05):
 
     env = MultiAgentGridEnv(
-        grid_file='grid_world.json',
+        grid_file=grid_file,
         coverage_radius=4,
         max_steps_per_episode=50,
         num_agents=4,
@@ -120,15 +132,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         # New Rollout
         obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
-    env = MultiAgentGridEnv(
-        grid_file='grid_world.json',
-        coverage_radius=4,
-        max_steps_per_episode=50,
-        num_agents=4,
-        initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
-    )
-
-    evaluate(ia2cc=ia2cc, env=env)
+    evaluate(ia2cc=ia2cc)
     ia2cc.display_moving_average(episodes_reward)
     save_best_episode(env.initial_positions, best_episode_actions,
                       best_episode_number, best_episode_reward)

@@ -44,7 +44,7 @@ class IA2CC:
     def get_value(self, state):
         return self.central_critic.forward(state)
 
-    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.03):
         T = len(rewards)
 
         # All state values
@@ -80,7 +80,7 @@ class IA2CC:
         return np.convolve(x, np.ones((count,)) / count, mode='valid')
 
     def display_moving_average(self, episodes_reward):
-        plt.plot(self.moving_average(episodes_reward, 20))
+        plt.plot(self.moving_average(episodes_reward, 100))
         plt.title('Learning curve')
         plt.xlabel("Episodes")
         plt.ylabel("Reward")
