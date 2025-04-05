@@ -13,14 +13,16 @@ import json
 grid_file = 'grid_world.json'
 
 
-def evaluate(ia2cc, episodes=20):
-    # Create 20 independent environments
-    envs = [MultiAgentGridEnv(
-        grid_file=grid_file,
-        coverage_radius=4,
-        max_steps_per_episode=50,
-        num_agents=4
-    ) for _ in range(episodes)]
+def evaluate(ia2cc, environment_count=20, envs=None):
+
+    # If environment are not provides
+    if envs is None:
+        envs = [MultiAgentGridEnv(
+            grid_file=grid_file,
+            coverage_radius=4,
+            max_steps_per_episode=50,
+            num_agents=4
+        ) for _ in range(environment_count)]
 
     rewards = []
 
@@ -29,14 +31,13 @@ def evaluate(ia2cc, episodes=20):
         done = False
         total_reward = 0
         while not done:
-            # deterministic=True → greedy
             actions, _, _ = ia2cc.act(obs)
             obs, r, done, _, _ = env.step(actions)
             total_reward += r
         rewards.append(total_reward)
 
     print(
-        f"\n✅ Avg evaluation reward over {episodes} environments: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
+        f"\n✅ Avg evaluation reward over {environment_count} environments: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
 
 
 def get_new_rollout():
@@ -50,7 +51,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         coverage_radius=4,
         max_steps_per_episode=50,
         num_agents=4,
-        initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
+        # initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
     )
 
     # NN pararmeters
@@ -104,9 +105,8 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
 
         episodes_reward.append(total_reward)
 
-        if episode % 100 == 0:
+        if episode % 1000 == 0:
             print(f"Episode {episode} return: {total_reward:.2f}")
-            print(env.agent_positions)
 
         if total_reward > best_episode_reward:
             best_episode_reward = total_reward
@@ -118,7 +118,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         std_r = np.std(rewards_buffer) + 1e-8
         normalized_rewards = [(r - mean_r) / std_r for r in rewards_buffer]
 
-        # Compute value of final state (for bootstrap)
+        # Value of the terminal state
         last_value = 0
 
         ia2cc.compute_episode_loss(
@@ -132,12 +132,14 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         # New Rollout
         obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
-    evaluate(ia2cc=ia2cc)
-    ia2cc.display_moving_average(episodes_reward)
-    save_best_episode(env.initial_positions, best_episode_actions,
-                      best_episode_number, best_episode_reward)
-    save_final_positions(env, best_episode_actions)
-    visualize_and_record_best_strategy(env, best_episode_actions)
+    # ia2cc.display_moving_average(episodes_reward)
+    # evaluate(ia2cc=ia2cc)
+    # save_best_episode(env.initial_positions, best_episode_actions,
+    #                   best_episode_number, best_episode_reward)
+    # save_final_positions(env, best_episode_actions)
+    # visualize_and_record_best_strategy(env, best_episode_actions)
+
+    return ia2cc, episodes_reward
 
 
 def save_best_episode(initial_positions, best_episode_actions, best_episode_number, best_episode_reward, filename='vdn_best_strategy.json'):
@@ -203,4 +205,5 @@ def visualize_and_record_best_strategy(env, best_episode_actions, filename='vdn_
     print(f"Best episode visualization saved as {filename}")
 
 
-train()
+if __name__ == '__main__':
+    train()

@@ -9,8 +9,11 @@ import random
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, reward_type='global', initial_positions=None):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, seed=None, reward_type='global', initial_positions=None):
         print('New environment created')
+
+        if seed is not None:
+            random.seed(seed)
 
         # Load the grid from the JSON file
         self.grid = self.load_grid(grid_file)
@@ -60,9 +63,11 @@ class MultiAgentGridEnv:
         initial_positions.append((x, y+1))
         initial_positions.append((x+1, y+1))
 
+        print(initial_positions)
         return initial_positions
 
     def reset(self):
+        self.initial_positions = self.initialize_position()
 
         # Sets the agents' positions to their initial positions.
         self.agent_positions = list(self.initial_positions)

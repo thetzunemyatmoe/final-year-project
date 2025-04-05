@@ -44,7 +44,7 @@ class IA2CC:
     def get_value(self, state):
         return self.central_critic.forward(state)
 
-    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.03):
+    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
         T = len(rewards)
 
         # All state values
@@ -77,7 +77,8 @@ class IA2CC:
             self.actor_optimizers[i].step()
 
     def moving_average(self, x, count):
-        return np.convolve(x, np.ones((count,)) / count, mode='valid')
+        # return np.convolve(x, np.ones((count,)) / count, mode='valid')
+        return np.convolve(x, np.ones(count), 'valid') / count
 
     def display_moving_average(self, episodes_reward):
         plt.plot(self.moving_average(episodes_reward, 100))
