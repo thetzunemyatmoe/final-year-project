@@ -17,8 +17,6 @@ class IA2CC:
         self.critic_input_size = critic_input_size
         self.num_agents = num_agents
 
-        print(f'Actor input size is {actor_input_size}')
-        print(f'Critic input size is {critic_input_size}')
         # Networks
         self.central_critic = Critic(input_size=self.critic_input_size)
         self.actors = [Actor(self.actor_input_size, self.actor_output_size)
@@ -29,6 +27,8 @@ class IA2CC:
             actor.parameters(), lr=actor_learning_rate) for actor in self.actors]
         self.critic_optimizer = optim.Adam(
             self.central_critic.parameters(), lr=critic_leanring_rate)
+
+        self.entropy_weight = entropy_weight
 
     def act(self, joint_observation):
         actions = []
@@ -44,7 +44,7 @@ class IA2CC:
     def get_value(self, state):
         return self.central_critic.forward(state)
 
-    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.05):
         T = len(rewards)
 
         # All state values
