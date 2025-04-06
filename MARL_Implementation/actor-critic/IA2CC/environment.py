@@ -65,13 +65,17 @@ class MultiAgentGridEnv:
         # print(initial_positions)
         return initial_positions
 
-    def reset(self, train=False):
+    def reset(self, train=False, seed=None):
 
-        if train:
+        if train and seed is not None:
+            seed = (seed % 20)
+            random.seed(seed)
             self.initial_positions = self.initialize_position()
 
         # Sets the agents' positions to their initial positions.
         self.agent_positions = list(self.initial_positions)
+
+        print(self.agent_positions)
 
         # Resets the coverage grid to zero (No ares have been covered)
         # self.coverage_grid = np.zeros_like(self.grid)
@@ -81,9 +85,6 @@ class MultiAgentGridEnv:
 
         # Update the coverage grid based on agent's initial position
         self.update_coverage()
-
-        # print(self.coverage_grid)
-        # print(self.grid)
 
         return self.get_observations(), self.get_state()
 

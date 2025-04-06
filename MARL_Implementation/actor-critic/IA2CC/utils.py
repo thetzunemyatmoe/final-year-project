@@ -1,6 +1,8 @@
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import os
 
 
 def running_average(data, window_size):
@@ -19,7 +21,7 @@ def generate_colors(n):
 def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
 
     # Calculate running averages
-    window_size = 50
+    window_size = 100
 
     avg_rewards_list = []
     for rewards in rewards_list:
@@ -46,3 +48,25 @@ def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
                     dpi=300, bbox_inches='tight')
         print("Plot saved")
     plt.show()
+
+
+def save_reward(path, rewards):
+    with open(path, 'w') as f:
+        for reward in rewards:
+            f.write(f"{reward}\n")
+
+
+def save_model(path, actors):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    for i, actor in enumerate(actors):
+        torch.save(actor.state_dict(), f"{path}_agent{i}.pt")
+
+
+def load_actors(actor_class, num_agents, input_size, output_size, path):
+    actors = []
+    for i in range(num_agents):
+        actor = actor_class(input_size, output_size)
+        actor.load_state_dict(torch.load(f"{path}_agent{i}.pt"))
+        actor.eval()  # Optional: set to eval mode if only evaluating
+        actors.append(actor)
+    return actors

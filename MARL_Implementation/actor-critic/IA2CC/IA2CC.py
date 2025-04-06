@@ -75,14 +75,3 @@ class IA2CC:
             self.actor_optimizers[i].zero_grad()
             actor_loss.backward()
             self.actor_optimizers[i].step()
-
-    def moving_average(self, x, count):
-        # return np.convolve(x, np.ones((count,)) / count, mode='valid')
-        return np.convolve(x, np.ones(count), 'valid') / count
-
-    def display_moving_average(self, episodes_reward):
-        plt.plot(self.moving_average(episodes_reward, 100))
-        plt.title('Learning curve')
-        plt.xlabel("Episodes")
-        plt.ylabel("Reward")
-        plt.show()
