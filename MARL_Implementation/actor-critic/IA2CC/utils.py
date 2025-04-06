@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import os
+from matplotlib.animation import FFMpegWriter
+import json
 
 
 def running_average(data, window_size):
@@ -70,3 +72,75 @@ def load_actors(actor_class, num_agents, input_size, output_size, path):
         actor.eval()  # Optional: set to eval mode if only evaluating
         actors.append(actor)
     return actors
+
+
+def save_best_episode(initial_positions, best_episode_actions, best_episode_number, best_episode_reward, filename='vdn_best_strategy.json'):
+    action_map = ['forward', 'backward', 'left', 'right', 'stay']
+
+    best_episode = {
+        # Convert to int if it's np.int64
+        "episode_number": int(best_episode_number),
+        # Convert to float if it's np.float64
+        "episode_reward": float(best_episode_reward)
+
+    }
+
+    for i in range(len(initial_positions)):
+        best_episode[f'agent_{i}'] = {
+            'actions': [action_map[action[i]] for action in best_episode_actions],
+            'initial_position': initial_positions[i]
+        }
+
+    with open(filename, 'w') as f:
+        json.dump(best_episode, f, indent=4)
+
+    print(f"Best episode actions and initial positions saved to {filename}")
+
+
+def save_final_positions(env, best_episode_actions, filename='vdn_final_positions.png'):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    env.reset()
+
+    for actions in best_episode_actions:
+        env.step(actions)
+
+    env.render(
+        ax, actions=best_episode_actions[-1], step=len(best_episode_actions)-1)
+    plt.title("Final Positions")
+    plt.savefig(filename)
+    plt.close(fig)
+    print(f"Final positions saved as {filename}")
+
+
+def visualize_and_record_best_strategy(env, best_episode_actions, filename='vdn_best_episode.mp4', save=True):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    env.reset()
+
+    if save:
+        writer = FFMpegWriter(fps=2)
+        with writer.saving(fig, filename, dpi=100):
+            # Capture the initial state
+            ax.clear()
+            env.render(ax, actions=None, step=0)
+            writer.grab_frame()
+            plt.pause(0.1)
+
+            for step, actions in enumerate(best_episode_actions, start=1):
+                env.step(actions)
+                ax.clear()
+                env.render(ax, actions=actions, step=step)
+                writer.grab_frame()
+                plt.pause(0.1)
+        print(f"Best episode visualization saved as {filename}")
+    else:
+        ax.clear()
+        env.render(ax, actions=None, step=0)
+        plt.pause(0.5)
+
+        for step, actions in enumerate(best_episode_actions, start=1):
+            env.step(actions)
+            ax.clear()
+            env.render(ax, actions=actions, step=step)
+            plt.pause(0.5)
+
+    plt.close(fig)
