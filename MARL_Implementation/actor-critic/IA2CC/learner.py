@@ -74,7 +74,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
     best_episode_number = None
 
     for episode in range(max_episode):
-        joint_observations, state = env.reset(train=True)
+        joint_observations, state = env.reset(train=True, seed=episode)
         total_reward = 0
         done = False
         episode_actions = []
@@ -127,6 +127,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
             log_probs_buffer,
             entropies_buffer,
             last_value,
+            gamma=ia2cc.gamma,
             entropy_weight=ia2cc.entropy_weight
         )
 

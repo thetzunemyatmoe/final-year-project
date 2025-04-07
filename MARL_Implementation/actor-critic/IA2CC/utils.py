@@ -53,6 +53,7 @@ def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
 
 
 def save_reward(path, rewards):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
         for reward in rewards:
             f.write(f"{reward}\n")

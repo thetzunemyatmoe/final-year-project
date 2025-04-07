@@ -28,6 +28,7 @@ class IA2CC:
         self.critic_optimizer = optim.Adam(
             self.central_critic.parameters(), lr=critic_leanring_rate)
 
+        self.gamma = gamma
         self.entropy_weight = entropy_weight
 
     def act(self, joint_observation):
@@ -44,7 +45,8 @@ class IA2CC:
     def get_value(self, state):
         return self.central_critic.forward(state)
 
-    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.05):
+    def compute_episode_loss(self, rewards, states, log_probs, entropies, last_value, gamma=0.99, entropy_weight=0.01):
+
         T = len(rewards)
 
         # All state values

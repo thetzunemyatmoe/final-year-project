@@ -75,11 +75,6 @@ class MultiAgentGridEnv:
         # Sets the agents' positions to their initial positions.
         self.agent_positions = list(self.initial_positions)
 
-        print(self.agent_positions)
-
-        # Resets the coverage grid to zero (No ares have been covered)
-        # self.coverage_grid = np.zeros_like(self.grid)
-
         # Reset current step count to zero
         self.current_step = 0
 
