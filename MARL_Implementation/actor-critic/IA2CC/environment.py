@@ -2,14 +2,13 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-# Library for the creation, manipulation, and analysis of complex networks(graphs).
 import networkx as nx
 import random
 
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, seed=None, reward_type='global', initial_positions=None):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, seed=None, initial_positions=None):
 
         if seed is not None:
             random.seed(seed)
@@ -28,8 +27,6 @@ class MultiAgentGridEnv:
             self.initial_positions = initial_positions
         else:
             self.initial_positions = self.initialize_position()
-
-        self.reward_type = reward_type
 
         # Calculate new obs_size for local rich observations
         self.obs_size = (

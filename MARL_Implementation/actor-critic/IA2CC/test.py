@@ -34,18 +34,17 @@ def evaluate_multi_agent(actors, env, num_episodes=10):
 
 GRID_FILE = 'grid_world.json'
 # env
-env = env = MultiAgentGridEnv(
+env = MultiAgentGridEnv(
     grid_file=GRID_FILE,
     coverage_radius=4,
     max_steps_per_episode=50,
-    num_agents=4,
-    # initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
+    num_agents=4
 )
 
 
 # Load models
 actors = load_actors(
-    Actor, 4, input_size=env.get_obs_size(), output_size=env.get_total_actions(), path="./model/entropy/0.01/0.01")
+    Actor, 4, input_size=env.get_obs_size(), output_size=env.get_total_actions(), path="./model/learning_rate/0.0001&0.001/")
 
 
 evaluate_multi_agent(actors, env)
