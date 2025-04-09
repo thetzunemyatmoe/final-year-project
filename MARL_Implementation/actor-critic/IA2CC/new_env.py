@@ -1,8 +1,6 @@
-# environment.py
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import networkx as nx
 import random
 
 
@@ -13,10 +11,8 @@ class MultiAgentGridEnv:
         if seed is not None:
             random.seed(seed)
 
-        # Load the grid from the JSON file
+        # Grid and its properties
         self.grid = self.load_grid(grid_file)
-
-        # Obtain height and width (shape function of an np array)
         self.grid_height, self.grid_width = self.grid.shape
 
         # Initialize instance variable
@@ -28,7 +24,7 @@ class MultiAgentGridEnv:
         else:
             self.initial_positions = self.initialize_position()
 
-        # Calculate new obs_size for local rich observations
+        # Observation size
         self.obs_size = (
             2 +  # Agent's own position (x, y)  ###
             4 +  # Sensor readings
@@ -38,12 +34,9 @@ class MultiAgentGridEnv:
             (num_agents - 1) * 2  # Relative positions of other agents (x, y)
         )
 
-        # Calcualte size of the state
+        # State size
         self.state_size = (2 * self.num_agents + (self.grid_height *
                            self.grid_width) + 2*(self.num_agents * (self.num_agents - 1)) + 1)
-
-        # NetworkX variable
-        self.nx = nx
 
     def load_grid(self, filename):
         with open(filename, 'r') as f:
@@ -59,7 +52,6 @@ class MultiAgentGridEnv:
         initial_positions.append((x, y+1))
         initial_positions.append((x+1, y+1))
 
-        # print(initial_positions)
         return initial_positions
 
     def reset(self, train=False, seed=None):
@@ -94,6 +86,9 @@ class MultiAgentGridEnv:
         actual_actions = []
         sensor_readings = self.get_sensor_readings()
 
+        # TODO - Delete this
+        previous_total_area = np.sum(self.coverage_grid > 0)
+
         # First, calculate all new positions
         for i, action in enumerate(actions):
             new_pos = self.get_new_position(self.agent_positions[i], action)
@@ -110,6 +105,10 @@ class MultiAgentGridEnv:
 
         self.agent_positions = new_positions
         self.update_coverage()
+        # TODO - Delete this
+        current_total_area = np.sum(self.coverage_grid > 0)
+
+        print(f'Area gained {current_total_area-previous_total_area}')
         global_reward = self.calculate_global_reward(
             actions=actual_actions) - invalid_penalty
 
@@ -158,27 +157,30 @@ class MultiAgentGridEnv:
                 if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
                     self.coverage_grid[ny, nx] = 1
 
+    def cover_area_on_grid(self, state, grid):
+        x, y = state
+        for dx in range(-self.coverage_radius, self.coverage_radius + 1):
+            for dy in range(-self.coverage_radius, self.coverage_radius + 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
+                    grid[ny, nx] += 1  # Increment instead of setting to 1
+
     # ***********
     # Reward Calculation
     # ***********
 
     def calculate_global_reward(self, actions):
         self.total_area = np.sum(self.coverage_grid > 0)
+
+        # Overlap Penalty
         self.overlap_penalty = self.calculate_overlap()
 
-        graph = self.build_graph()
-        self.num_components = nx.number_connected_components(graph)
-
-        if self.num_components == 1:
-            self.connectivity_penalty = 0
-        else:
-            self.connectivity_penalty = (
-                self.num_agents) * (self.num_components - 1) * ((1 + 2*self.coverage_radius)**2)
-
+        # Sensor Penalty
         self.sensor_1s = self.calculate_sensor_penalty()
         self.sensor_penalty = self.sensor_1s * \
             ((1 + 2*self.coverage_radius)**2)
 
+        # Energy Penalty
         self.energy_penalty = self.calculate_energy_penalty(actions)
 
         reward = (
@@ -211,58 +213,6 @@ class MultiAgentGridEnv:
 
         return total_penalty
 
-    # Hole penalty Implementation, using chordless cycles
-
-    def calculate_hole_penalty(self, graph):
-        chordless_cycles = self.find_chordless_cycles(graph)
-        num_holes = len(chordless_cycles)
-        return num_holes * (self.num_agents * (1 + 2*self.coverage_radius)**2)
-
-    def find_chordless_cycles(self, graph):
-        chordless_cycles = []
-        visited_cycles = set()
-        for node in graph.nodes():
-            self._find_cycles_from_node(graph, node, [node], set(
-                [node]), chordless_cycles, visited_cycles)
-        return chordless_cycles
-
-    def _find_cycles_from_node(self, graph, start, path, visited, chordless_cycles, visited_cycles):
-        neighbors = set(graph.neighbors(path[-1])) - set(path[1:])
-        for neighbor in neighbors:
-            if neighbor == start and len(path) > 3:
-                cycle = path[:]
-                if self._is_chordless(graph, cycle):
-                    cycle_key = tuple(sorted(cycle))
-                    if cycle_key not in visited_cycles:
-                        chordless_cycles.append(cycle)
-                        visited_cycles.add(cycle_key)
-            elif neighbor not in visited:
-                self._find_cycles_from_node(
-                    graph, start, path + [neighbor], visited | {neighbor}, chordless_cycles, visited_cycles)
-
-    def _is_chordless(self, graph, cycle):
-        for i in range(len(cycle)):
-            for j in range(i+2, len(cycle)):
-                if (i != 0 or j != len(cycle)-1) and graph.has_edge(cycle[i], cycle[j]):
-                    return False
-        return True
-
-    def build_graph(self):
-        G = nx.Graph()
-        G.add_nodes_from(range(self.num_agents))
-        for i, pos1 in enumerate(self.agent_positions):
-            for j, pos2 in enumerate(self.agent_positions[i+1:], i+1):
-                if self.areas_overlap(pos1, pos2):
-                    G.add_edge(i, j)
-        return G
-
-    def areas_overlap(self, pos1, pos2):
-        x1, y1 = pos1
-        x2, y2 = pos2
-        return abs(x1 - x2) <= 2 * self.coverage_radius and abs(y1 - y2) <= 2 * self.coverage_radius
-
-    # End of hole penalty implementation
-
     def calculate_overlap(self):
         overlap_grid = np.zeros_like(self.coverage_grid)
         for pos in self.agent_positions:
@@ -274,16 +224,8 @@ class MultiAgentGridEnv:
         weighted_overlap = np.sum(overlap_counts)
         return weighted_overlap
 
-    def cover_area_on_grid(self, state, grid):
-        x, y = state
-        for dx in range(-self.coverage_radius, self.coverage_radius + 1):
-            for dy in range(-self.coverage_radius, self.coverage_radius + 1):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < self.grid_width and 0 <= ny < self.grid_height and self.grid[ny, nx] == 0:
-                    grid[ny, nx] += 1  # Increment instead of setting to 1
-
     # ***********
-    # Reward Calculation end
+    # Get methods
     # ***********
 
     def get_observations(self):
@@ -386,12 +328,12 @@ class MultiAgentGridEnv:
             readings.append(reading)
         return readings
 
-    # Can be useful for debugging
-
     def get_metrics(self):
         return {
             "Energy Usage": self.energy_usage
         }
+
+    # Trajectory Rendering
 
     def render(self, ax=None, actions=None, step=None, return_rgb=False):
         if ax is None:

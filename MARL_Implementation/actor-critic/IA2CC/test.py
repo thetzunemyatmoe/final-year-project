@@ -1,6 +1,6 @@
-from utils import load_actors, save_best_episode, save_final_positions, visualize_and_record_best_strategy
+from utils import load_actors, save_best_episode, save_final_positions, visualize_trajectory
 from Actor import Actor
-from environment import MultiAgentGridEnv
+from new_env import MultiAgentGridEnv
 import torch
 
 
@@ -17,19 +17,15 @@ def evaluate_multi_agent(actors, env, num_episodes=10):
             actor = actors[i]
             obvs = obs[i]
             action, _, _ = actor(obvs)
-            # action = actors[i](obs[i])
             actions.append(action)
-        print(actions)
         obs, reward, done, actions, _ = env.step(actions)
 
         rewards += reward
         episode_actions.append(actions)
 
     print(rewards)
-    # save_best_episode(env.initial_positions, best_episode_actions,
-    #                   best_episode_number, best_episode_reward)
-    # save_final_positions(env, best_episode_actions)
-    visualize_and_record_best_strategy(env, episode_actions)
+    print(env.get_metrics())
+    visualize_trajectory(env, episode_actions)
 
 
 GRID_FILE = 'grid_world.json'
@@ -38,7 +34,8 @@ env = MultiAgentGridEnv(
     grid_file=GRID_FILE,
     coverage_radius=4,
     max_steps_per_episode=50,
-    num_agents=4
+    num_agents=4,
+    seed=31
 )
 
 

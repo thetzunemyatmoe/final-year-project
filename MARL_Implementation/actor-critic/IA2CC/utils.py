@@ -75,7 +75,7 @@ def load_actors(actor_class, num_agents, input_size, output_size, path):
     return actors
 
 
-def save_best_episode(initial_positions, best_episode_actions, best_episode_number, best_episode_reward, filename='vdn_best_strategy.json'):
+def save_best_episode(initial_positions, best_episode_actions, best_episode_number, best_episode_reward, filename='best_strategy.json'):
     action_map = ['forward', 'backward', 'left', 'right', 'stay']
 
     best_episode = {
@@ -98,7 +98,7 @@ def save_best_episode(initial_positions, best_episode_actions, best_episode_numb
     print(f"Best episode actions and initial positions saved to {filename}")
 
 
-def save_final_positions(env, best_episode_actions, filename='vdn_final_positions.png'):
+def save_final_positions(env, best_episode_actions, filename='final_positions.png'):
     fig, ax = plt.subplots(figsize=(10, 10))
     env.reset()
 
@@ -113,11 +113,11 @@ def save_final_positions(env, best_episode_actions, filename='vdn_final_position
     print(f"Final positions saved as {filename}")
 
 
-def visualize_and_record_best_strategy(env, best_episode_actions, filename='vdn_best_episode.mp4', save=True):
+def visualize_trajectory(env, episode_actions, filename=None):
     fig, ax = plt.subplots(figsize=(10, 10))
     env.reset()
 
-    if save:
+    if filename is not None:
         writer = FFMpegWriter(fps=2)
         with writer.saving(fig, filename, dpi=100):
             # Capture the initial state
@@ -126,7 +126,7 @@ def visualize_and_record_best_strategy(env, best_episode_actions, filename='vdn_
             writer.grab_frame()
             plt.pause(0.1)
 
-            for step, actions in enumerate(best_episode_actions, start=1):
+            for step, actions in enumerate(episode_actions, start=1):
                 env.step(actions)
                 ax.clear()
                 env.render(ax, actions=actions, step=step)
@@ -138,7 +138,7 @@ def visualize_and_record_best_strategy(env, best_episode_actions, filename='vdn_
         env.render(ax, actions=None, step=0)
         plt.pause(0.5)
 
-        for step, actions in enumerate(best_episode_actions, start=1):
+        for step, actions in enumerate(episode_actions, start=1):
             env.step(actions)
             ax.clear()
             env.render(ax, actions=actions, step=step)

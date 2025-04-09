@@ -3,14 +3,13 @@ from IA2CC import IA2CC
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from utils import save_best_episode, save_final_positions, visualize_and_record_best_strategy
+from utils import save_best_episode, save_final_positions, visualize_trajectory
 
 
 GRID_FILE = 'grid_world.json'
 
 
 def evaluate(ia2cc, environment_count=1000, envs=None):
-
     # If environment are not provides
     if envs is None:
         envs = [MultiAgentGridEnv(
