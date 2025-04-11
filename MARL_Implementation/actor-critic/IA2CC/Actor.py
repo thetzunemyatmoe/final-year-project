@@ -15,8 +15,19 @@ class Actor(nn.Module):
             nn.Linear(128, output_size)
         )
 
-    def forward(self, local_observation):
+    def forward(self, local_observation, sensor_readings):
+        # Include 'stay' action
+        mask = sensor_readings + [0]
         logits = self.get_logit(local_observation)
+        action_mask = torch.tensor(
+            mask, dtype=torch.uint8, device=logits.device)
+
+        # 0 = valid → True, 1 = invalid → False
+        valid_mask = (action_mask == 0).to(
+            dtype=torch.bool, device=logits.device)
+
+        logits = logits.masked_fill(~valid_mask, float('-inf'))
+
         dist = Categorical(logits=logits)
         action = dist.sample()
         log_prob = dist.log_prob(action)

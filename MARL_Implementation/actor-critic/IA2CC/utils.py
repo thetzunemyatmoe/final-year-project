@@ -5,6 +5,8 @@ import random
 import os
 from matplotlib.animation import FFMpegWriter
 import json
+from environment import MultiAgentGridEnv
+GRID_FILE = 'grid_world.json'
 
 
 def running_average(data, window_size):
@@ -145,3 +147,83 @@ def visualize_trajectory(env, episode_actions, filename=None):
             plt.pause(0.5)
 
     plt.close(fig)
+
+
+def visualize_best_trajectory(initial_positions, episode_actions, filename=None):
+    print('Running visual')
+
+    env = MultiAgentGridEnv(
+        grid_file=GRID_FILE,
+        coverage_radius=4,
+        max_steps_per_episode=50,
+        num_agents=4,
+        initial_positions=initial_positions
+    )
+    fig, ax = plt.subplots(figsize=(10, 10))
+    env.reset()
+
+    if filename is not None:
+        writer = FFMpegWriter(fps=2)
+        with writer.saving(fig, filename, dpi=100):
+            # Capture the initial state
+            ax.clear()
+            env.render(ax, actions=None, step=0)
+            writer.grab_frame()
+            plt.pause(0.1)
+
+            for step, actions in enumerate(episode_actions, start=1):
+                env.step(actions)
+                ax.clear()
+                env.render(ax, actions=actions, step=step)
+                writer.grab_frame()
+                plt.pause(0.1)
+        print(f"Best episode visualization saved as {filename}")
+    else:
+        ax.clear()
+        env.render(ax, actions=None, step=0)
+        plt.pause(0.5)
+
+        for step, actions in enumerate(episode_actions, start=1):
+            env.step(actions)
+            ax.clear()
+            env.render(ax, actions=actions, step=step)
+            plt.pause(0.5)
+
+    plt.close(fig)
+
+
+def evaluate(model, episode_count=50):
+
+    episode_reward = []
+    episode_energy = []
+
+    for episode in range(50, episode_count+50):
+        reward, energy = run_episode(episode, model)
+        episode_reward.append(reward)
+        episode_energy.append(energy)
+
+    print(
+        f"Average reward over environments: {np.mean(episode_reward):.2f} ± {np.std(episode_reward):.2f}")
+    print(
+        f"Average energy usage over environments: {np.mean(episode_energy):.2f} ± {np.std(episode_energy):.2f}")
+
+
+def run_episode(seed, model):
+    env = MultiAgentGridEnv(
+        grid_file=GRID_FILE,
+        coverage_radius=4,
+        max_steps_per_episode=50,
+        num_agents=4,
+        seed=seed
+    )
+
+    obs, _ = env.reset()
+    done = False
+    total_reward = 0
+    while not done:
+        sensor_readings = env.get_sensor_readings()
+        actions, _, _ = model.act(obs, sensor_readings)
+        obs, r, done, _, _ = env.step(actions)
+        total_reward += r
+
+    return total_reward, env.get_metrics()["Energy Usage"]

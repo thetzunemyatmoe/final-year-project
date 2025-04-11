@@ -4,7 +4,7 @@ from new_env import MultiAgentGridEnv
 import torch
 
 
-def evaluate_multi_agent(actors, env, num_episodes=10):
+def evaluate_multi_agent(actors, env):
     num_agents = len(actors)
     obs, _ = env.reset()
     done = False
@@ -23,9 +23,7 @@ def evaluate_multi_agent(actors, env, num_episodes=10):
         rewards += reward
         episode_actions.append(actions)
 
-    print(rewards)
-    print(env.get_metrics())
-    visualize_trajectory(env, episode_actions)
+    return rewards, env.get_metrics()
 
 
 GRID_FILE = 'grid_world.json'

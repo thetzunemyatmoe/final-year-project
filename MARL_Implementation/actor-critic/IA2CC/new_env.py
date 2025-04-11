@@ -19,6 +19,7 @@ class MultiAgentGridEnv:
         self.coverage_radius = coverage_radius
         self.max_steps_per_episode = max_steps_per_episode
         self.num_agents = num_agents
+
         if initial_positions is not None:
             self.initial_positions = initial_positions
         else:
@@ -185,9 +186,9 @@ class MultiAgentGridEnv:
 
         reward = (
             self.total_area
-            - self.overlap_penalty
-            - self.sensor_penalty
-            - self.energy_penalty
+            - self.w_overlap * self.overlap_penalty
+            - self.sensor_penalty * self.sensor_penalty
+            - self.energy_penalty * self.energy_penalty
         )
         return reward
 

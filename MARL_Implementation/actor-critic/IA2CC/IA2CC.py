@@ -31,12 +31,13 @@ class IA2CC:
         self.gamma = gamma
         self.entropy_weight = entropy_weight
 
-    def act(self, joint_observation):
+    def act(self, joint_observation, sensor_readings):
         actions = []
         log_probs = []
         entropies = []
         for agent_id, actor in enumerate(self.actors):
-            action, log_prob, entropy = actor(joint_observation[agent_id])
+            action, log_prob, entropy = actor(
+                joint_observation[agent_id], sensor_readings[agent_id])
             actions.append(action)
             log_probs.append(log_prob)
             entropies.append(entropy)

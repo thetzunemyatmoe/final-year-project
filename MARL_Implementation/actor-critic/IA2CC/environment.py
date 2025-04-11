@@ -8,7 +8,7 @@ import random
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, seed=None, initial_positions=None):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, reward_weight=[3.0, 1.0, 0.3], seed=None, initial_positions=None):
 
         if seed is not None:
             random.seed(seed)
@@ -23,6 +23,7 @@ class MultiAgentGridEnv:
         self.coverage_radius = coverage_radius
         self.max_steps_per_episode = max_steps_per_episode
         self.num_agents = num_agents
+        self.reward_weight = reward_weight
         if initial_positions is not None:
             self.initial_positions = initial_positions
         else:
@@ -62,14 +63,20 @@ class MultiAgentGridEnv:
         # print(initial_positions)
         return initial_positions
 
-    def reset(self, train=False, seed=None):
+    def reset(self, train=None):
+        # Weights for reward
+        self.w_overlap = self.reward_weight[0]
+        self.w_sensor = self.reward_weight[1]
+        self.w_energy = self.reward_weight[2]
 
         self.energy_usage = 0
 
-        if train and seed is not None:
-            seed = (seed % 20)
+        if train is not None:
+            seed = (train % 50)
             random.seed(seed)
             self.initial_positions = self.initialize_position()
+
+        # print(self.initial_positions)
 
         # Sets the agents' positions to their initial positions.
         self.agent_positions = list(self.initial_positions)
@@ -183,9 +190,9 @@ class MultiAgentGridEnv:
 
         reward = (
             self.total_area
-            - self.overlap_penalty
-            - self.sensor_penalty
-            - self.energy_penalty
+            - self.w_overlap * self.overlap_penalty
+            - self.w_sensor * self.sensor_penalty
+            - self.w_energy * self.energy_penalty
         )
         return reward
 
