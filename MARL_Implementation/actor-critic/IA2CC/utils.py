@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,7 +39,7 @@ def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
 
     for index, avg in enumerate(avg_rewards_list):
         plt.plot(episodes_list[index][window_size-1:], avg, color=colors[index],
-                 linewidth=2, label=f'Entropy Weight[{names[index]}] {window_size}-ep avg')
+                 linewidth=2, label=f'{window_size}-ep avg')
 
     plt.xlabel('Episode')
     plt.ylabel('Reward')
@@ -54,102 +55,17 @@ def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
     plt.show()
 
 
+# Save cumulative reward from each episode
 def save_reward(path, rewards):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
         for reward in rewards:
             f.write(f"{reward}\n")
 
-
-def save_model(path, actors):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    for i, actor in enumerate(actors):
-        torch.save(actor.state_dict(), f"{path}_agent{i}.pt")
+# Visualize and save the trajectory of an episode
 
 
-def load_actors(actor_class, num_agents, input_size, output_size, path):
-    actors = []
-    for i in range(num_agents):
-        actor = actor_class(input_size, output_size)
-        actor.load_state_dict(torch.load(f"{path}_agent{i}.pt"))
-        actor.eval()  # Optional: set to eval mode if only evaluating
-        actors.append(actor)
-    return actors
-
-
-def save_best_episode(initial_positions, best_episode_actions, best_episode_number, best_episode_reward, filename='best_strategy.json'):
-    action_map = ['forward', 'backward', 'left', 'right', 'stay']
-
-    best_episode = {
-        # Convert to int if it's np.int64
-        "episode_number": int(best_episode_number),
-        # Convert to float if it's np.float64
-        "episode_reward": float(best_episode_reward)
-
-    }
-
-    for i in range(len(initial_positions)):
-        best_episode[f'agent_{i}'] = {
-            'actions': [action_map[action[i]] for action in best_episode_actions],
-            'initial_position': initial_positions[i]
-        }
-
-    with open(filename, 'w') as f:
-        json.dump(best_episode, f, indent=4)
-
-    print(f"Best episode actions and initial positions saved to {filename}")
-
-
-def save_final_positions(env, best_episode_actions, filename='final_positions.png'):
-    fig, ax = plt.subplots(figsize=(10, 10))
-    env.reset()
-
-    for actions in best_episode_actions:
-        env.step(actions)
-
-    env.render(
-        ax, actions=best_episode_actions[-1], step=len(best_episode_actions)-1)
-    plt.title("Final Positions")
-    plt.savefig(filename)
-    plt.close(fig)
-    print(f"Final positions saved as {filename}")
-
-
-def visualize_trajectory(env, episode_actions, filename=None):
-    fig, ax = plt.subplots(figsize=(10, 10))
-    env.reset()
-
-    if filename is not None:
-        writer = FFMpegWriter(fps=2)
-        with writer.saving(fig, filename, dpi=100):
-            # Capture the initial state
-            ax.clear()
-            env.render(ax, actions=None, step=0)
-            writer.grab_frame()
-            plt.pause(0.1)
-
-            for step, actions in enumerate(episode_actions, start=1):
-                env.step(actions)
-                ax.clear()
-                env.render(ax, actions=actions, step=step)
-                writer.grab_frame()
-                plt.pause(0.1)
-        print(f"Best episode visualization saved as {filename}")
-    else:
-        ax.clear()
-        env.render(ax, actions=None, step=0)
-        plt.pause(0.5)
-
-        for step, actions in enumerate(episode_actions, start=1):
-            env.step(actions)
-            ax.clear()
-            env.render(ax, actions=actions, step=step)
-            plt.pause(0.5)
-
-    plt.close(fig)
-
-
-def visualize_best_trajectory(initial_positions, episode_actions, filename=None):
+def visualize_trajectory(initial_positions, episode_actions, filename=None):
     print('Running visual')
 
     env = MultiAgentGridEnv(
@@ -163,6 +79,10 @@ def visualize_best_trajectory(initial_positions, episode_actions, filename=None)
     env.reset()
 
     if filename is not None:
+        directory = os.path.dirname(filename)
+        if directory != '':
+            os.makedirs(directory, exist_ok=True)
+
         writer = FFMpegWriter(fps=2)
         with writer.saving(fig, filename, dpi=100):
             # Capture the initial state
@@ -177,7 +97,7 @@ def visualize_best_trajectory(initial_positions, episode_actions, filename=None)
                 env.render(ax, actions=actions, step=step)
                 writer.grab_frame()
                 plt.pause(0.1)
-        print(f"Best episode visualization saved as {filename}")
+        print(f"Visualization saved as {filename}")
     else:
         ax.clear()
         env.render(ax, actions=None, step=0)
@@ -192,38 +112,61 @@ def visualize_best_trajectory(initial_positions, episode_actions, filename=None)
     plt.close(fig)
 
 
+# Save metrics in a CSV file
+def save_metrics(metrics, filename):
+    directory = os.path.dirname(filename)
+    if directory != '':
+        os.makedirs(directory, exist_ok=True)
+
+    # Convert to DataFrame
+    df = pd.DataFrame(list(metrics.items()),
+                      columns=['Metric', 'Value'])
+
+    # Save to CSV
+    df.to_csv(filename, index=False)
+
+    print(df)
+
+
+# Evluate on unseen seeds
 def evaluate(model, episode_count=50):
 
-    episode_reward = []
-    episode_energy = []
-
     for episode in range(50, episode_count+50):
-        reward, energy = run_episode(episode, model)
-        episode_reward.append(reward)
-        episode_energy.append(energy)
-
-    print(
-        f"Average reward over environments: {np.mean(episode_reward):.2f} ± {np.std(episode_reward):.2f}")
-    print(
-        f"Average energy usage over environments: {np.mean(episode_energy):.2f} ± {np.std(episode_energy):.2f}")
+        run_episode(episode, model)
 
 
+# Test on one single seed
 def run_episode(seed, model):
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
-        max_steps_per_episode=50,
+        max_steps_per_episode=200,
         num_agents=4,
         seed=seed
     )
 
+    initial_positons = env.initial_positions
+    episode_actions = []
+
     obs, _ = env.reset()
     done = False
-    total_reward = 0
     while not done:
+        # Get sensor readings
         sensor_readings = env.get_sensor_readings()
-        actions, _, _ = model.act(obs, sensor_readings)
-        obs, r, done, _, _ = env.step(actions)
-        total_reward += r
 
-    return total_reward, env.get_metrics()["Energy Usage"]
+        # Forward pass
+        actions, _, _ = model.act(obs, sensor_readings)
+
+        # Step
+        obs, _, done, _, _ = env.step(actions)
+
+        # Record actions
+        episode_actions.append(actions)
+
+    # Save statistics
+    metrics = env.get_metrics()
+    save_metrics(metrics, f'evaluate/seed_{seed}/statistics.csv')
+
+    # Save the trajectory
+    visualize_trajectory(
+        initial_positons, episode_actions, f'evaluate/seed_{seed}/trajectory.mp4')

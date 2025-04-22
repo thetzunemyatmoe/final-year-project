@@ -3,8 +3,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-
-
+import os
 from Actor import Actor
 from Critic import Critic
 
@@ -78,3 +77,16 @@ class IA2CC:
             self.actor_optimizers[i].zero_grad()
             actor_loss.backward()
             self.actor_optimizers[i].step()
+
+    def save_actors(self, directory='model'):
+        os.makedirs(directory, exist_ok=True)
+        for i, actor in enumerate(self.actors):
+            path = os.path.join(directory, f'actor_{i}.pth')
+            torch.save(actor.state_dict(), path)
+
+    def load_actors(self, directory='model'):
+        for i, actor in enumerate(self.actors):
+            path = os.path.join(directory, f'actor_{i}.pth')
+            actor.load_state_dict(torch.load(path))
+            actor.eval()
+        print(f"Loaded all {self.num_agents} actors from '{directory}/'")

@@ -1,40 +1,10 @@
 from environment import MultiAgentGridEnv
 from IA2CC import IA2CC
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from utils import save_best_episode, save_final_positions, visualize_trajectory, visualize_best_trajectory, display_plot, evaluate
+from utils import display_plot
 
 
 GRID_FILE = 'grid_world.json'
-
-
-# def evaluate(ia2cc, environment_count=1000, envs=None):
-#     # If environment are not provides
-#     if envs is None:
-#         envs = [MultiAgentGridEnv(
-#             grid_file=GRID_FILE,
-#             coverage_radius=4,
-#             max_steps_per_episode=50,
-#             num_agents=4
-#         ) for _ in range(environment_count)]
-#     else:
-#         environment_count = len(envs)
-
-#     rewards = []
-
-#     for env in envs:
-#         obs, _ = env.reset()
-#         done = False
-#         total_reward = 0
-#         while not done:
-#             actions, _, _ = ia2cc.act(obs)
-#             obs, r, done, _, _ = env.step(actions)
-#             total_reward += r
-#         rewards.append(total_reward)
-
-#     print(
-#         f"\n✅ Avg evaluation reward over {environment_count} environments: {np.mean(rewards):.2f} ± {np.std(rewards):.2f}")
 
 
 def get_new_rollout():
@@ -46,7 +16,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
-        max_steps_per_episode=50,
+        max_steps_per_episode=200,
         num_agents=4,
         # initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
     )
@@ -138,18 +108,23 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         # New Rollout
         obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
-    # evaluate(ia2cc=ia2cc)
-    # save_best_episode(env.initial_positions, best_episode_actions,
-    #                   best_episode_number, best_episode_reward)
-    # save_final_positions(env, best_episode_actions)
-    # visualize_and_record_best_strategy(env, best_episode_actions)
-    visualize_best_trajectory(
-        initial_positions=best_initial_positions, episode_actions=best_episode_actions)
+    ia2cc.save_actors(directory='model/main')
 
     return ia2cc, episodes_reward, episodes
 
 
 if __name__ == '__main__':
-    model, episode_rewards, episodes = train(max_episode=5000, actor_lr=0.0001,
-                                             critic_lr=0.005, gamma=0.99, entropy_weight=0.01)
-    evaluate(model)
+    rewards_list = []
+    episodes_list = []
+    names = []
+    _, rewards, episodes = train(max_episode=5000, actor_lr=0.0001,
+                                 critic_lr=0.005, gamma=0.99, entropy_weight=0.01)
+
+    rewards_list.append(rewards)
+    episodes_list.append(episodes)
+    names.append('VOID')
+    display_plot(rewards_list=rewards_list,
+                 episodes_list=episodes_list,
+                 names=names,
+                 plot_title='',
+                 save=True)
