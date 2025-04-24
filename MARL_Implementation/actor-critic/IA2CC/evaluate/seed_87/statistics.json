@@ -1,0 +1,44 @@
+{
+    "Metic": {
+        "Total Energy Usage": 1138,
+        "Step Taken": 200,
+        "Total cells covered (Out of 784)": 712,
+        "Coverage Rate": "90.81632653061224 %"
+    },
+    "Grid Info": {
+        "Height": 30,
+        "Width": 30,
+        "Total Available Cells": 784,
+        "Number of UAVs": 4
+    },
+    "UAV": {
+        "Number of valid actions": 5,
+        "Local observation size": 175,
+        "Initial Positions": [
+            [
+                6,
+                25
+            ],
+            [
+                7,
+                25
+            ],
+            [
+                6,
+                26
+            ],
+            [
+                7,
+                26
+            ]
+        ],
+        "Coverage Radius": 4
+    },
+    "Max step allowed": 200,
+    "Seed": 87,
+    "Reward Weight": {
+        "total area weight": 5.0,
+        "overlap weight": 1.0,
+        "energy weight": 2.0
+    }
+}

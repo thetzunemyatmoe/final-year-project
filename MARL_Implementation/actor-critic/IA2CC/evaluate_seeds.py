@@ -1,6 +1,7 @@
 from IA2CC import IA2CC
 from environment import MultiAgentGridEnv
-from utils import evaluate
+from utils import evaluate, load_json
+
 
 GRID_FILE = 'grid_world.json'
 
@@ -22,6 +23,8 @@ model = IA2CC(actor_input_size=actor_input_size,
               critic_input_size=critic_input_size,
               num_agents=env.num_agents)
 
-model.load_actors('model/main')
+model.load_actors('model/testmodel')
+model_stats = load_json('model/testmodel/model_stats.json')
 
-evaluate(model)
+
+evaluate(model, model_stats=model_stats)

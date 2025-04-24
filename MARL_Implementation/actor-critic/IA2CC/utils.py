@@ -23,7 +23,7 @@ def generate_colors(n):
     return colors
 
 
-def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
+def display_plot(rewards_list, episodes_list, names, plot_title, filename='test', save=False):
 
     # Calculate running averages
     window_size = 100
@@ -43,19 +43,58 @@ def display_plot(rewards_list, episodes_list, names, plot_title, save=False):
 
     plt.xlabel('Episode')
     plt.ylabel('Reward')
-    plt.title(f'Comparison of {plot_title}')
+    plt.title(plot_title)
     plt.legend()
     plt.grid(True, alpha=0.3)
 
     # Save the plot
     if save:
-        plt.savefig(f'Comparison of {plot_title}.png',
+        plt.savefig(filename,
                     dpi=300, bbox_inches='tight')
         print("Plot saved")
     plt.show()
 
 
+def load_json(filename):
+    with open(filename) as json_file:
+        data = json.load(json_file)
+        return data
+
+
+def save_model_stats(name, model, env, max_episode, time, filename):
+    training_stats = {}
+    training_stats["Name"] = name
+    training_stats["Actor"] = {
+        "Learning rate": model.actor_learning_rate,
+        "Input size": model.actor_input_size,
+        "Output size": model.actor_output_size,
+    }
+    training_stats["Critic"] = {
+        "Learning rate": model.critic_learning_rate,
+        "Input size": model.critic_input_size,
+    }
+
+    training_stats["Discount Factor"] = model.gamma
+    training_stats["Entropy Weight"] = model.entropy_weight
+    training_stats["Number of Episodes"] = max_episode
+    training_stats["Maximum Step Per Episode"] = env.max_steps_per_episode
+    training_stats["Time taken"] = time
+
+    training_stats["Reward Weight"] = env.reward_weight
+
+    directory = os.path.dirname(filename)
+    if directory != '':
+        os.makedirs(directory, exist_ok=True)
+
+    try:
+        with open(filename, 'w') as fp:
+            json.dump(training_stats, fp, indent=4)
+    except Exception as e:
+        print(f"Error saving file: {e}")
+
 # Save cumulative reward from each episode
+
+
 def save_reward(path, rewards):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
@@ -112,37 +151,56 @@ def visualize_trajectory(initial_positions, episode_actions, filename=None):
     plt.close(fig)
 
 
-# Save metrics in a CSV file
-def save_metrics(metrics, filename):
+def save_evalutation_stats(env, metric, model_stats, filename):
+    info = {}
+
+    info['Metic'] = metric
+    # Grid into
+    info['Grid Info'] = {
+        'Height': env.grid_height,
+        'Width': env.grid_width,
+        'Total Available Cells': int(env.total_cells_to_cover),
+        'Number of UAVs': env.num_agents
+    }
+    info['UAV'] = {
+        'Number of valid actions': env.get_total_actions(),
+        'Local observation size': env.get_obs_size(),
+        'Initial Positions': env.initial_positions,
+        'Coverage Radius': env.coverage_radius
+    }
+    info['Max step allowed'] = env.max_steps_per_episode
+    info['Seed'] = env.seed
+    info['Reward Weight'] = model_stats['Reward Weight']
+
     directory = os.path.dirname(filename)
     if directory != '':
         os.makedirs(directory, exist_ok=True)
 
-    # Convert to DataFrame
-    df = pd.DataFrame(list(metrics.items()),
-                      columns=['Metric', 'Value'])
-
-    # Save to CSV
-    df.to_csv(filename, index=False)
-
-    print(df)
+    try:
+        with open(filename, 'w') as fp:
+            json.dump(info, fp, indent=4)
+    except Exception as e:
+        print(f"Error saving file: {e}")
 
 
 # Evluate on unseen seeds
-def evaluate(model, episode_count=50):
+
+def evaluate(model, model_stats,  episode_count=50):
 
     for episode in range(50, episode_count+50):
-        run_episode(episode, model)
+        run_episode(episode, model, model_stats)
+        print('-----------------------------------\n')
 
 
 # Test on one single seed
-def run_episode(seed, model):
+def run_episode(seed, model, model_stats):
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
         max_steps_per_episode=200,
         num_agents=4,
-        seed=seed
+        seed=seed,
+        reward_weight=model_stats['Reward Weight']
     )
 
     initial_positons = env.initial_positions
@@ -165,7 +223,8 @@ def run_episode(seed, model):
 
     # Save statistics
     metrics = env.get_metrics()
-    save_metrics(metrics, f'evaluate/seed_{seed}/statistics.csv')
+    save_evalutation_stats(env=env, metric=metrics, model_stats=model_stats,
+                           filename=f'evaluate/seed_{seed}/statistics.json')
 
     # Save the trajectory
     visualize_trajectory(

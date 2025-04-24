@@ -1,8 +1,10 @@
 from environment import MultiAgentGridEnv
 from IA2CC import IA2CC
 import numpy as np
-from utils import display_plot
-
+from utils import display_plot, save_model_stats
+import time
+from datetime import timedelta
+import pandas as pd
 
 GRID_FILE = 'grid_world.json'
 
@@ -11,14 +13,17 @@ def get_new_rollout():
     return [], [], [], [], []
 
 
-def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_weight=0.05):
+def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_weight=0.05, path=None, reward_weight=None):
+
+    # Start training time
+    start_time = time.time()
 
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
         max_steps_per_episode=200,
         num_agents=4,
-        # initial_positions=[(1, 1), (2, 1), (1, 2), (2, 2)]
+        reward_weight=reward_weight
     )
 
     # NN pararmeters
@@ -31,17 +36,13 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
                   critic_input_size=critic_input_size,
                   num_agents=env.num_agents,
                   actor_learning_rate=actor_lr,
-                  critic_leanring_rate=critic_lr,
+                  critic_learning_rate=critic_lr,
                   gamma=gamma,
-                  entropy_weight=entropy_weight
+                  entropy_weight=entropy_weight,
                   )
 
     episodes_reward = []
     episodes = []
-    best_episode_reward = float('-inf')
-    best_initial_positions = None
-    best_episode_actions = None
-    best_episode_number = None
 
     for episode in range(max_episode):
         joint_observations, state = env.reset(train=episode)
@@ -80,12 +81,6 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         if episode % 1000 == 0:
             print(f"Episode {episode} return: {total_reward:.2f}")
 
-        if total_reward > best_episode_reward:
-            best_initial_positions = env.initial_positions
-            best_episode_reward = total_reward
-            best_episode_actions = episode_actions
-            best_episode_number = episode
-
         episodes.append(episode)
         # Normalize rewards_buffer
         mean_r = np.mean(rewards_buffer)
@@ -108,23 +103,44 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
         # New Rollout
         obs_buffer, next_obs_buffer, log_probs_buffer, entropies_buffer, rewards_buffer = get_new_rollout()
 
-    ia2cc.save_actors(directory='model/main')
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    time_taken = str(timedelta(seconds=elapsed_time))
+
+    # Save model and training stats
+    if path is not None:
+        ia2cc.save_actors(directory=f'model/{path}')
+        save_model_stats(name='Independent Advantage Actor Centralized Critic (IA2CC)',
+                         model=ia2cc, env=env, max_episode=max_episode, time=time_taken, filename=f"model/{path}/model_stats.json")
 
     return ia2cc, episodes_reward, episodes
 
 
 if __name__ == '__main__':
+
+    # Reward weight
+    reward_weight = {
+        'total area weight': 10.0,
+        'overlap weight': 0.5,
+        'energy weight': 0.5
+    }
+
+    # Record for plot
     rewards_list = []
     episodes_list = []
     names = []
-    _, rewards, episodes = train(max_episode=5000, actor_lr=0.0001,
-                                 critic_lr=0.005, gamma=0.99, entropy_weight=0.01)
 
+    # Start training
+    _, rewards, episodes = train(max_episode=5000, actor_lr=0.0001,
+                                 critic_lr=0.005, gamma=0.99, entropy_weight=0.01, path='model2', reward_weight=reward_weight)
+
+    # Plot
     rewards_list.append(rewards)
     episodes_list.append(episodes)
     names.append('VOID')
     display_plot(rewards_list=rewards_list,
                  episodes_list=episodes_list,
                  names=names,
-                 plot_title='',
+                 plot_title='Reward Trend',
+                 filename='Reward trend in training',
                  save=True)

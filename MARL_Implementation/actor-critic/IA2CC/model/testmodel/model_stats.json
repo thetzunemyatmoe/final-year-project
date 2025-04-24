@@ -1,0 +1,22 @@
+{
+    "Name": "Independent Advantage Actor Centralized Critic (IA2CC)",
+    "Actor": {
+        "Learning rate": 0.0001,
+        "Input size": 175,
+        "Output size": 5
+    },
+    "Critic": {
+        "Learning rate": 0.005,
+        "Input size": 933
+    },
+    "Discount Factor": 0.99,
+    "Entropy Weight": 0.01,
+    "Number of Episodes": 5000,
+    "Maximum Step Per Episode": 200,
+    "Time taken": "0:27:20.803066",
+    "Reward Weight": {
+        "total area weight": 5.0,
+        "overlap weight": 1.0,
+        "energy weight": 2.0
+    }
+}

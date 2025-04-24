@@ -9,11 +9,22 @@ import time
 
 class MultiAgentGridEnv:
 
-    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, seed=None, initial_positions=None):
+    def __init__(self, grid_file, coverage_radius, max_steps_per_episode, num_agents, reward_weight=None, seed=None, initial_positions=None):
 
         if seed is not None:
             random.seed(seed)
 
+        # Default weight for reward
+        if reward_weight is None:
+            self.reward_weight = {
+                'total area weight': 1.0,
+                'overlap weight': 1.0,
+                'energy weight': 1.0
+            }
+        else:
+            self.reward_weight = reward_weight
+
+        self.seed = seed
         # Grid and its properties
         self.grid = self.load_grid(grid_file)
         self.grid_height, self.grid_width = self.grid.shape
@@ -61,6 +72,7 @@ class MultiAgentGridEnv:
         return initial_positions
 
     def reset(self, train=None):
+        self.done = False
 
         # Metric
         self.energy_usage = []
@@ -113,20 +125,21 @@ class MultiAgentGridEnv:
         self.agent_positions = new_positions
         self.update_coverage()
 
+        self.done = (
+            np.sum(self.coverage_grid) >= self.total_cells_to_cover
+            or self.current_step >= self.max_steps_per_episode
+        )
+
         # Global Reward
         global_reward = self.calculate_global_reward(
             actions=actual_actions) - invalid_penalty
 
         self.energy_usage.append(self.energy_penalty)
 
-        done = (
-            np.sum(self.coverage_grid) >= self.total_cells_to_cover
-            or self.current_step >= self.max_steps_per_episode
-        )
         # print(
         #     f'{self.current_step} | {np.sum(self.coverage_grid)} | {self.total_cells_to_cover}')
 
-        return self.get_observations(), global_reward, done, actual_actions, self.get_state()
+        return self.get_observations(), global_reward, self.done, actual_actions, self.get_state()
 
     def is_valid_move(self, new_pos, sensor_reading, action, other_new_positions):
         x, y = new_pos
@@ -174,9 +187,19 @@ class MultiAgentGridEnv:
     # ***********
 
     def calculate_global_reward(self, actions):
+
         # Rewards
         self.total_area_gain = np.sum(
             self.coverage_grid) - self.prev_total_area
+
+        # Complete coverage at end of termination
+        if self.done and np.sum(self.coverage_grid) == self.total_cells_to_cover:
+            self.complete_reward = 100
+        # Incomplete coverage at end of termination (Max steps)
+        elif self.done and np.sum(self.coverage_grid) < self.total_cells_to_cover:
+            self.complete_reward = -10
+        else:
+            self.complete_reward = 0
 
         # Penalties
         self.overlap_penalty = self.calculate_overlap()
@@ -185,10 +208,11 @@ class MultiAgentGridEnv:
         self.energy_penalty = self.calculate_energy_penalty(actions)
 
         reward = (
-            5 * self.total_area_gain
-            - self.overlap_penalty
+            self.reward_weight['total area weight'] * self.total_area_gain
+            + self.complete_reward
+            - self.reward_weight['overlap weight'] * self.overlap_penalty
             - self.sensor_penalty
-            - self.energy_penalty
+            - self.reward_weight['energy weight'] * self.energy_penalty
         )
         return reward
 
@@ -348,7 +372,7 @@ class MultiAgentGridEnv:
         return {
             "Total Energy Usage": sum(self.energy_usage),
             "Step Taken": self.current_step,
-            f"Total cells covered (Out of {total_cells})":  total_cells_covered,
+            f"Total cells covered (Out of {total_cells})":  int(total_cells_covered),
             "Coverage Rate": f'{(total_cells_covered / total_cells) * 100} %'
         }
 

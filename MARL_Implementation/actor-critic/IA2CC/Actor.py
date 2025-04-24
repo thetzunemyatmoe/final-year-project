@@ -39,3 +39,18 @@ class Actor(nn.Module):
 
     def get_logit(self, local_observation):
         return self.network((self.build_input(local_observation)))
+
+    def extract_model_info(model):
+        layers = []
+        for layer in model.network:
+            if isinstance(layer, nn.Linear):
+                layers.append({
+                    "type": "Linear",
+                    "in_features": layer.in_features,
+                    "out_features": layer.out_features
+                })
+            elif isinstance(layer, nn.ReLU):
+                layers.append({"type": "ReLU"})
+            else:
+                layers.append({"type": layer.__class__.__name__})
+        return layers

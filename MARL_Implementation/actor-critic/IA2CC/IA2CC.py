@@ -9,12 +9,14 @@ from Critic import Critic
 
 
 class IA2CC:
-    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.0001, critic_leanring_rate=0.005, gamma=0.99, entropy_weight=0.05):
+    def __init__(self, actor_input_size, actor_output_size, critic_input_size, num_agents, actor_learning_rate=0.0001, critic_learning_rate=0.005, gamma=0.99, entropy_weight=0.05):
         # NN pararmeters
         self.actor_input_size = actor_input_size
         self.actor_output_size = actor_output_size
         self.critic_input_size = critic_input_size
         self.num_agents = num_agents
+        self.actor_learning_rate = actor_learning_rate
+        self.critic_learning_rate = critic_learning_rate
 
         # Networks
         self.central_critic = Critic(input_size=self.critic_input_size)
@@ -23,9 +25,9 @@ class IA2CC:
 
         # Optimizer
         self.actor_optimizers = [optim.Adam(
-            actor.parameters(), lr=actor_learning_rate) for actor in self.actors]
+            actor.parameters(), lr=self.actor_learning_rate) for actor in self.actors]
         self.critic_optimizer = optim.Adam(
-            self.central_critic.parameters(), lr=critic_leanring_rate)
+            self.central_critic.parameters(), lr=self.critic_learning_rate)
 
         self.gamma = gamma
         self.entropy_weight = entropy_weight
