@@ -1,0 +1,7 @@
+reward_weights = [
+    {'total area weight': 2.0, 'overlap weight': 1.0, 'energy weight': 1.0},  # More coverage focused
+    {'total area weight': 1.0, 'overlap weight': 1.0, 'energy weight': 2.0},  # More energy saving
+    {'total area weight': 5.0, 'overlap weight': 1.0, 'energy weight': 1.0},  # Extreme coverage
+    {'total area weight': 1.0, 'overlap weight': 1.0, 'energy weight': 5.0},  # Extreme energy saving
+    {'total area weight': 2.0, 'overlap weight': 1.0, 'energy weight': 0.0},  # No energy penalty (baseline)
+]

@@ -23,8 +23,10 @@ model = IA2CC(actor_input_size=actor_input_size,
               critic_input_size=critic_input_size,
               num_agents=env.num_agents)
 
-model.load_actors('model/gamma/0.999')
-model_stats = load_json('model/gamma/0.999/model_stats.json')
+path = 'rewardweight/config1'
+
+model.load_actors(f'model/{path}')
+model_stats = load_json(f'model/{path}/model_stats.json')
 
 
-evaluate(model, model_stats=model_stats)
+evaluate(model, model_stats=model_stats, path=path)

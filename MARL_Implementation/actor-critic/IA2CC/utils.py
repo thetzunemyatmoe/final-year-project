@@ -7,6 +7,8 @@ import os
 from matplotlib.animation import FFMpegWriter
 import json
 from environment import MultiAgentGridEnv
+import matplotlib
+matplotlib.use('Agg')  # Use a non-interactive backend
 GRID_FILE = 'grid_world.json'
 
 
@@ -112,7 +114,6 @@ def save_reward(path, rewards):
 
 
 def visualize_trajectory(initial_positions, episode_actions, filename=None):
-    print('Running visual')
 
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
@@ -135,27 +136,64 @@ def visualize_trajectory(initial_positions, episode_actions, filename=None):
             ax.clear()
             env.render(ax, actions=None, step=0)
             writer.grab_frame()
-            plt.pause(0.1)
 
             for step, actions in enumerate(episode_actions, start=1):
                 env.step(actions)
                 ax.clear()
                 env.render(ax, actions=actions, step=step)
                 writer.grab_frame()
-                plt.pause(0.1)
+
         print(f"Visualization saved as {filename}")
     else:
-        ax.clear()
-        env.render(ax, actions=None, step=0)
-        plt.pause(0.5)
-
-        for step, actions in enumerate(episode_actions, start=1):
-            env.step(actions)
-            ax.clear()
-            env.render(ax, actions=actions, step=step)
-            plt.pause(0.5)
+        print("Filename not provided, skipping visualization saving.")
 
     plt.close(fig)
+
+# def visualize_trajectory(initial_positions, episode_actions, filename=None):
+#     print('Running visual')
+
+#     env = MultiAgentGridEnv(
+#         grid_file=GRID_FILE,
+#         coverage_radius=4,
+#         max_steps_per_episode=50,
+#         num_agents=4,
+#         initial_positions=initial_positions
+#     )
+#     fig, ax = plt.subplots(figsize=(10, 10))
+#     env.reset()
+
+#     if filename is not None:
+#         directory = os.path.dirname(filename)
+#         if directory != '':
+#             os.makedirs(directory, exist_ok=True)
+
+#         writer = FFMpegWriter(fps=2)
+#         with writer.saving(fig, filename, dpi=100):
+#             # Capture the initial state
+#             ax.clear()
+#             env.render(ax, actions=None, step=0)
+#             writer.grab_frame()
+#             plt.pause(0.1)
+
+#             for step, actions in enumerate(episode_actions, start=1):
+#                 env.step(actions)
+#                 ax.clear()
+#                 env.render(ax, actions=actions, step=step)
+#                 writer.grab_frame()
+#                 plt.pause(0.1)
+#         print(f"Visualization saved as {filename}")
+#     else:
+#         ax.clear()
+#         env.render(ax, actions=None, step=0)
+#         plt.pause(0.5)
+
+#         for step, actions in enumerate(episode_actions, start=1):
+#             env.step(actions)
+#             ax.clear()
+#             env.render(ax, actions=actions, step=step)
+#             plt.pause(0.5)
+
+#     plt.close(fig)
 
 
 def save_evalutation_stats(env, metric, model_stats, filename):
@@ -192,15 +230,15 @@ def save_evalutation_stats(env, metric, model_stats, filename):
 
 # Evluate on unseen seeds
 
-def evaluate(model, model_stats,  episode_count=50):
+def evaluate(model, model_stats,  episode_count=100, path=''):
 
-    for episode in range(50, episode_count+50):
-        run_episode(episode, model, model_stats)
+    for episode in range(100, episode_count+50):
+        run_episode(episode, model, model_stats, path=path)
         print('-----------------------------------\n')
 
 
 # Test on one single seed
-def run_episode(seed, model, model_stats):
+def run_episode(seed, model, model_stats, path=''):
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
@@ -231,8 +269,8 @@ def run_episode(seed, model, model_stats):
     # Save statistics
     metrics = env.get_metrics()
     save_evalutation_stats(env=env, metric=metrics, model_stats=model_stats,
-                           filename=f'evaluate/seed_{seed}/gamma/statistics.json')
+                           filename=f'evaluate/seed_{seed}/{path}/statistics.json')
 
     # Save the trajectory
     visualize_trajectory(
-        initial_positons, episode_actions, f'evaluate/seed_{seed}/gamma/trajectory.mp4')
+        initial_positons, episode_actions, f'evaluate/seed_{seed}/{path}/trajectory.mp4')

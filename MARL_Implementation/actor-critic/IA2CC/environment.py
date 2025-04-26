@@ -443,4 +443,3 @@ class MultiAgentGridEnv:
             return image
         else:
             plt.draw()
-            plt.pause(0.001)
