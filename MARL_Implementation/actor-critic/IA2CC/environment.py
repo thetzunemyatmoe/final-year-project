@@ -209,7 +209,6 @@ class MultiAgentGridEnv:
 
         reward = (
             self.reward_weight['total area weight'] * self.total_area_gain
-            + self.complete_reward
             - self.reward_weight['overlap weight'] * self.overlap_penalty
             - self.sensor_penalty
             - self.reward_weight['energy weight'] * self.energy_penalty

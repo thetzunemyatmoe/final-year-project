@@ -21,7 +21,7 @@ def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_w
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
-        max_steps_per_episode=200,
+        max_steps_per_episode=100,
         num_agents=4,
         reward_weight=reward_weight
     )

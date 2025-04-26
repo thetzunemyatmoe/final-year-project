@@ -23,8 +23,8 @@ model = IA2CC(actor_input_size=actor_input_size,
               critic_input_size=critic_input_size,
               num_agents=env.num_agents)
 
-model.load_actors('model/testmodel')
-model_stats = load_json('model/testmodel/model_stats.json')
+model.load_actors('model/gamma/0.999')
+model_stats = load_json('model/gamma/0.999/model_stats.json')
 
 
 evaluate(model, model_stats=model_stats)

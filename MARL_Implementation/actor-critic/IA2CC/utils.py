@@ -14,13 +14,20 @@ def running_average(data, window_size):
     return np.convolve(data, np.ones(window_size), 'valid') / window_size
 
 
-def generate_colors(n):
-    colors = []
-    while len(colors) < n:
-        color = (random.random(), random.random(), random.random())
-        if color not in colors:  # prevent exact repeats
-            colors.append(color)
-    return colors
+def generate_colors():
+    base_colors = [
+        (0.121, 0.466, 0.705),  # blue
+        (1.0, 0.498, 0.054),    # orange
+        (0.172, 0.627, 0.172),  # green
+        (0.839, 0.153, 0.157),  # red
+        (0.580, 0.404, 0.741),  # purple
+        (0.549, 0.337, 0.294),  # brown
+        (0.890, 0.467, 0.761),  # pink
+        (0.498, 0.498, 0.498),  # grey
+        (0.737, 0.741, 0.133),  # yellow-green
+        (0.090, 0.745, 0.811),  # cyan
+    ]
+    return base_colors
 
 
 def display_plot(rewards_list, episodes_list, names, plot_title, filename='test', save=False):
@@ -33,13 +40,13 @@ def display_plot(rewards_list, episodes_list, names, plot_title, filename='test'
         avg = running_average(rewards, window_size)
         avg_rewards_list.append(avg)
 
-    colors = generate_colors(len(avg_rewards_list))
+    colors = generate_colors()
     # Create the plot
     plt.figure(figsize=(12, 6))
 
     for index, avg in enumerate(avg_rewards_list):
         plt.plot(episodes_list[index][window_size-1:], avg, color=colors[index],
-                 linewidth=2, label=f'{window_size}-ep avg')
+                 linewidth=2, label=f'{names[index]} {window_size}-ep avg')
 
     plt.xlabel('Episode')
     plt.ylabel('Reward')
@@ -224,8 +231,8 @@ def run_episode(seed, model, model_stats):
     # Save statistics
     metrics = env.get_metrics()
     save_evalutation_stats(env=env, metric=metrics, model_stats=model_stats,
-                           filename=f'evaluate/seed_{seed}/statistics.json')
+                           filename=f'evaluate/seed_{seed}/gamma/statistics.json')
 
     # Save the trajectory
     visualize_trajectory(
-        initial_positons, episode_actions, f'evaluate/seed_{seed}/trajectory.mp4')
+        initial_positons, episode_actions, f'evaluate/seed_{seed}/gamma/trajectory.mp4')
