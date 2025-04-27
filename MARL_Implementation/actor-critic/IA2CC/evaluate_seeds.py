@@ -23,7 +23,7 @@ model = IA2CC(actor_input_size=actor_input_size,
               critic_input_size=critic_input_size,
               num_agents=env.num_agents)
 
-path = 'rewardweight/config1'
+path = 'rewardweight5/config5'
 
 model.load_actors(f'model/{path}')
 model_stats = load_json(f'model/{path}/model_stats.json')
