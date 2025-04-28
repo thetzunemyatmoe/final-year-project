@@ -23,10 +23,18 @@ model = IA2CC(actor_input_size=actor_input_size,
               critic_input_size=critic_input_size,
               num_agents=env.num_agents)
 
-path = 'rewardweight5/config5'
+
+# rewards = [1, 2, 3, 4]
+
+# for reward in rewards:
+#     path = f'rewardweight{reward}/config5'
+
+#     model.load_actors(f'model/{path}')
+#     model_stats = load_json(f'model/{path}/model_stats.json')
+
+#     evaluate(model, model_stats=model_stats, path=path)
+path = f'highreward'
 
 model.load_actors(f'model/{path}')
 model_stats = load_json(f'model/{path}/model_stats.json')
-
-
 evaluate(model, model_stats=model_stats, path=path)

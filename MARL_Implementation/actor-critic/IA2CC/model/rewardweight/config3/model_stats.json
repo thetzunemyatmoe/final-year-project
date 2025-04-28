@@ -10,13 +10,13 @@
         "Input size": 933
     },
     "Discount Factor": 0.999,
-    "Entropy Weight": 0.01,
+    "Entropy Weight": 0.05,
     "Number of Episodes": 5000,
-    "Maximum Step Per Episode": 200,
-    "Time taken": "0:22:47.277297",
+    "Maximum Step Per Episode": 150,
+    "Time taken": "0:20:59.715051",
     "Reward Weight": {
-        "total area weight": 6.0,
-        "overlap weight": 1.5,
-        "energy weight": 0.5
+        "total area weight": 12.0,
+        "overlap weight": 0.8,
+        "energy weight": 0.8
     }
 }

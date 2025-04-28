@@ -192,15 +192,6 @@ class MultiAgentGridEnv:
         self.total_area_gain = np.sum(
             self.coverage_grid) - self.prev_total_area
 
-        # Complete coverage at end of termination
-        if self.done and np.sum(self.coverage_grid) == self.total_cells_to_cover:
-            self.complete_reward = 100
-        # Incomplete coverage at end of termination (Max steps)
-        elif self.done and np.sum(self.coverage_grid) < self.total_cells_to_cover:
-            self.complete_reward = -10
-        else:
-            self.complete_reward = 0
-
         # Penalties
         self.overlap_penalty = self.calculate_overlap()
         self.sensor_penalty = self.calculate_sensor_penalty() * \
@@ -210,7 +201,7 @@ class MultiAgentGridEnv:
         reward = (
             self.reward_weight['total area weight'] * self.total_area_gain
             - self.reward_weight['overlap weight'] * self.overlap_penalty
-            - self.sensor_penalty
+            - 0.5 * self.sensor_penalty
             - self.reward_weight['energy weight'] * self.energy_penalty
         )
         return reward

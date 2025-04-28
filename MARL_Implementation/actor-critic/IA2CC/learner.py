@@ -13,7 +13,7 @@ def get_new_rollout():
     return [], [], [], [], []
 
 
-def train(max_episode=3000, actor_lr=1e-4, critic_lr=5e-3, gamma=0.99, entropy_weight=0.05, path=None, reward_weight=None):
+def train(max_episode=5000, actor_lr=0.0001, critic_lr=0.001, gamma=0.999, entropy_weight=0.05, path=None, reward_weight=None):
 
     # Start training time
     start_time = time.time()
@@ -120,9 +120,9 @@ if __name__ == '__main__':
 
     # Reward weight
     reward_weight = {
-        'total area weight': 10.0,
-        'overlap weight': 0.5,
-        'energy weight': 0.5
+        'total area weight': 12.0,
+        'overlap weight': 0.8,
+        'energy weight': 0.8
     }
 
     # Record for plot
@@ -131,8 +131,8 @@ if __name__ == '__main__':
     names = []
 
     # Start training
-    _, rewards, episodes = train(max_episode=5000, actor_lr=0.0001,
-                                 critic_lr=0.005, gamma=0.99, entropy_weight=0.01, path='model2', reward_weight=reward_weight)
+    _, rewards, episodes = train(max_episode=3000, actor_lr=0.0001,
+                                 critic_lr=0.001, gamma=0.999, entropy_weight=0.05, path='highreward', reward_weight=reward_weight)
 
     # Plot
     rewards_list.append(rewards)
