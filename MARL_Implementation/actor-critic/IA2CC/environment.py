@@ -125,10 +125,7 @@ class MultiAgentGridEnv:
         self.agent_positions = new_positions
         self.update_coverage()
 
-        self.done = (
-            np.sum(self.coverage_grid) >= self.total_cells_to_cover
-            or self.current_step >= self.max_steps_per_episode
-        )
+        self.done = self.current_step >= self.max_steps_per_episode
 
         # Global Reward
         global_reward = self.calculate_global_reward(
@@ -359,9 +356,13 @@ class MultiAgentGridEnv:
 
         total_cells = self.total_cells_to_cover
         total_cells_covered = np.sum(self.coverage_grid)
+
+        total_steps = self.current_step
+        total_energy = sum(self.energy_usage)
         return {
-            "Total Energy Usage": sum(self.energy_usage),
-            "Step Taken": self.current_step,
+            "Total Energy Usage": total_energy,
+            "Step Taken": total_steps,
+            "Average Energy": total_energy / total_steps,
             f"Total cells covered (Out of {total_cells})":  int(total_cells_covered),
             "Coverage Rate": f'{(total_cells_covered / total_cells) * 100} %'
         }

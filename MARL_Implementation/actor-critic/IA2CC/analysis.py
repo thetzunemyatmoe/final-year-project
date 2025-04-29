@@ -1,88 +1,85 @@
 import os
 import json
-import pandas as pd
+import numpy as np
 
-# Settings
+# Path to the base 'evaluate' directory
 base_dir = 'evaluate'
-text_output_file = 'result_table.txt'
-csv_output_file = 'result_table.csv'
 
-# Collect data
-rows = []
+# List to store all extracted 'Metic' data
+all_metics = []
 
+metrics = {}
+
+
+# Walk through each seed_* directory
 for seed_folder in os.listdir(base_dir):
     seed_path = os.path.join(base_dir, seed_folder)
-    if not os.path.isdir(seed_path) or not seed_folder.startswith('seed_'):
-        continue
 
-    seed_num = int(seed_folder.split('_')[1])
+    # Seed number
+    _, seed = seed_folder.split("_")
 
-    for reward_folder in os.listdir(seed_path):
-        reward_path = os.path.join(seed_path, reward_folder)
-        if not os.path.isdir(reward_path) or not reward_folder.startswith('rewardweight'):
-            continue
+    if os.path.isdir(seed_path) and seed_folder.startswith('seed_'):
+        rewardweight_path = os.path.join(seed_path, 'rewardweight')
 
-        reward_num = int(reward_folder.replace('rewardweight', ''))
+        if os.path.exists(rewardweight_path):
+            for config_folder in os.listdir(rewardweight_path):
 
-        stats_file = os.path.join(reward_path, 'config5', 'statistics.json')
+                # Reward weight configuration
+                m = len(config_folder)
+                config = config_folder[m-1]
 
-        if not os.path.exists(stats_file):
-            print(f"Warning: Missing {stats_file}")
-            continue
+                if config not in metrics:
+                    metrics[config] = {}
+                if seed not in metrics[config]:
+                    metrics[config][seed] = {}
 
-        with open(stats_file, 'r') as f:
-            stats = json.load(f)
-
-        try:
-            coverage_rate_str = stats['Metic']['Coverage Rate']
-            coverage_rate = float(coverage_rate_str.strip(' %'))
-            total_energy = stats['Metic']['Total Energy Usage']
-
-            rows.append(
-                (seed_num, f"rewardweight{reward_num}",
-                 int(coverage_rate), int(total_energy))
-            )
-
-        except KeyError as e:
-            print(f"Error parsing {stats_file}: missing {e}")
-            continue
+                config_path = os.path.join(rewardweight_path, config_folder)
+                if os.path.isdir(config_path) and config_folder.startswith('config'):
+                    stats_file = os.path.join(config_path, 'statistics.json')
+                    if os.path.exists(stats_file):
+                        with open(stats_file, 'r') as f:
+                            data = json.load(f)
+                            if 'Metic' in data:
+                                all_metics.append(data['Metic'])
+                                metrics[config][seed] = data['Metic']
 
 
-# Sort the rows
-rows.sort()
+for config in metrics:
+    coverage_track = []
+    total_energy_track = []
+    avg_energy_track = []
+    for seed in metrics[config]:
+        metric = metrics[config][seed]
 
-# Save pretty table (.txt)
-col_widths = [10, 20, 20, 15]
-header = f"{'Seed'.ljust(col_widths[0])}|{'Reward Weight'.ljust(col_widths[1])}|{'Coverage Rate'.ljust(col_widths[2])}|{'Total Energy'.ljust(col_widths[3])}"
-separator = '-' * (sum(col_widths) + 3)
+        # Coverage
+        coverage_str = metric['Coverage Rate']
+        coverage_track.append(float(coverage_str.strip().replace('%', '')))
 
-lines = [header, separator]
+        # Total Energy
+        total_energy_str = metric['Total Energy Usage']
+        total_energy_track.append(float(total_energy_str))
 
-current_seed = None
+    # Coverage Rate
+    coverage_track.sort()
+    coverage_track = np.array(coverage_track)
 
-for seed, reward, coverage, energy in rows:
-    if current_seed is None:
-        current_seed = seed
-    elif seed != current_seed:
-        lines.append('')  # Blank line between different seeds
-        current_seed = seed
+    # Average and Std for coverage
+    average_coverage = np.mean(coverage_track)
+    std_coverage = np.std(coverage_track)
 
-    line = f"{str(seed).ljust(col_widths[0])}|{reward.ljust(col_widths[1])}|{f'{coverage:.2f}'.ljust(col_widths[2])}|{str(energy).ljust(col_widths[3])}"
-    lines.append(line)
+    # Total energy
+    total_energy_track.sort()
+    total_energy_track = np.array(total_energy_track)
 
-with open(text_output_file, 'w') as f:
-    for line in lines:
-        f.write(line + '\n')
+    # Highest, Lowest, Average, Std for energy
+    highest = np.max(total_energy_track)
+    lowest = np.min(total_energy_track)
+    avg_energy = np.mean(total_energy_track)
+    std_energy = np.std(total_energy_track)
 
-print(f"\n✅ Text table saved successfully to '{text_output_file}'!")
+    # Print results
+    print(f'Reward function [{config}]')
+    print(f"{'Highest':<10} {'Lowest':<10} {'Avg Energy':<12} {'Std Energy':<12} {'Avg Coverage':<14} {'Std Coverage':<14}")
+    print(f"{highest:<10.2f} {lowest:<10.2f} {avg_energy:<12.2f} {std_energy:<12.2f} {average_coverage:<14.2f} {std_coverage:<14.2f}")
 
-# Save as CSV for easy analysis
-df = pd.DataFrame(
-    rows, columns=["Seed", "Reward Weight", "Coverage Rate", "Total Energy"])
-df.to_csv(csv_output_file, index=False)
-
-print(f"✅ CSV file saved successfully to '{csv_output_file}'!")
-
-# Optional: show quick stats
-print("\n📊 Quick Summary (Coverage Rate per Reward Weight):")
-print(df.groupby('Reward Weight')["Coverage Rate"].mean())
+    print('-----------------')

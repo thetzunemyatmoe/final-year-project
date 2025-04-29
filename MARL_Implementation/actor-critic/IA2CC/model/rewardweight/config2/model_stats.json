@@ -13,10 +13,10 @@
     "Entropy Weight": 0.05,
     "Number of Episodes": 5000,
     "Maximum Step Per Episode": 150,
-    "Time taken": "0:21:06.034895",
+    "Time taken": "0:21:46.108235",
     "Reward Weight": {
-        "total area weight": 7.0,
-        "overlap weight": 1.2,
-        "energy weight": 1.5
+        "total area weight": 12.0,
+        "overlap weight": 0.8,
+        "energy weight": 0.0
     }
 }

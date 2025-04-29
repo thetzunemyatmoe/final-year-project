@@ -3,7 +3,7 @@ from environment import MultiAgentGridEnv
 from utils import evaluate, load_json
 
 
-GRID_FILE = 'grid_world.json'
+GRID_FILE = 'grid_world2.json'
 
 env = MultiAgentGridEnv(
     grid_file=GRID_FILE,
@@ -24,17 +24,12 @@ model = IA2CC(actor_input_size=actor_input_size,
               num_agents=env.num_agents)
 
 
-# rewards = [1, 2, 3, 4]
+weights = [1, 2]
 
-# for reward in rewards:
-#     path = f'rewardweight{reward}/config5'
+for weight in weights:
+    path = f'rewardweight/config{weight}'
 
-#     model.load_actors(f'model/{path}')
-#     model_stats = load_json(f'model/{path}/model_stats.json')
+    model.load_actors(f'model/{path}')
+    model_stats = load_json(f'model/{path}/model_stats.json')
 
-#     evaluate(model, model_stats=model_stats, path=path)
-path = f'highreward'
-
-model.load_actors(f'model/{path}')
-model_stats = load_json(f'model/{path}/model_stats.json')
-evaluate(model, model_stats=model_stats, path=path)
+    evaluate(model, model_stats=model_stats, path=path)

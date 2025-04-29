@@ -9,7 +9,7 @@ import json
 from environment import MultiAgentGridEnv
 import matplotlib
 matplotlib.use('Agg')  # Use a non-interactive backend
-GRID_FILE = 'grid_world.json'
+GRID_FILE = 'grid_world2.json'
 
 
 def running_average(data, window_size):
@@ -184,9 +184,9 @@ def save_evalutation_stats(env, metric, model_stats, filename):
 
 # Evluate on unseen seeds
 
-def evaluate(model, model_stats,  episode_count=10, path=''):
+def evaluate(model, model_stats,  episode_count=5, path=''):
 
-    for episode in range(50, episode_count+50):
+    for episode in range(0, episode_count):
         run_episode(episode, model, model_stats, path=path)
         print('-----------------------------------\n')
 
@@ -196,7 +196,7 @@ def run_episode(seed, model, model_stats, path=''):
     env = MultiAgentGridEnv(
         grid_file=GRID_FILE,
         coverage_radius=4,
-        max_steps_per_episode=100,
+        max_steps_per_episode=200,
         num_agents=4,
         seed=seed,
         reward_weight=model_stats['Reward Weight']
