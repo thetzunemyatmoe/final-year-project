@@ -3,7 +3,7 @@ from environment import MultiAgentGridEnv
 from utils import evaluate, load_json
 
 
-GRID_FILE = 'grid_world2.json'
+GRID_FILE = 'grid_world3.json'
 
 env = MultiAgentGridEnv(
     grid_file=GRID_FILE,

@@ -9,7 +9,7 @@ import json
 from environment import MultiAgentGridEnv
 import matplotlib
 matplotlib.use('Agg')  # Use a non-interactive backend
-GRID_FILE = 'grid_world2.json'
+GRID_FILE = 'grid_world3.json'
 
 
 def running_average(data, window_size):
